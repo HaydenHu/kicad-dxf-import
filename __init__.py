@@ -1,7 +1,7 @@
 """
 KiCad DXF Import Plugin for KiCad 10.0+
 
-Imports DXF files (AutoCAD R12-R2013) into the current Pcbnew board.
+Imports DXF files (AutoCAD R12-R2018+) into the current Pcbnew board.
 Supported entities: LINE, CIRCLE, ARC, LWPOLYLINE, POLYLINE(2D),
 TEXT, MTEXT, ELLIPSE, SPLINE.
 
@@ -77,7 +77,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         self.name = "Import DXF 1.0"
         self.category = "Import"
         self.description = (
-            "Import DXF files (AutoCAD/R12-R2013) into the current PCB. "
+            "Import DXF files (AutoCAD R12-R2018+) into the current PCB. "
             "Supports lines, circles, arcs, polylines, splines, ellipses, and text."
         )
         self.show_toolbar_button = True

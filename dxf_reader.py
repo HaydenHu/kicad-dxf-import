@@ -1,5 +1,5 @@
 """
-DXF File Reader - Pure Python parser for DXF R12-R2013 format.
+DXF File Reader - Pure Python parser for DXF R12-R2018+ format.
 
 Handles the most common DXF entity types used for PCB outlines and
 mechanical drawings: LINE, CIRCLE, ARC, LWPOLYLINE, POLYLINE (2D),
@@ -161,16 +161,32 @@ class DxfReader:
 
     def _detect_dxf_encoding(self, filepath: str) -> str:
         """Detect DXF file encoding from $DWGCODEPAGE header.
-        Falls back to gbk (common for Chinese CAD) then utf-8."""
+        Falls back to gbk (common for Chinese CAD), then built-in heuristics,
+        then utf-8."""
         import re
+        import codecs
         cp_map = {
-            "ANSI_936": "gbk",
-            "ANSI_950": "big5",
-            "ANSI_932": "shift_jis",
-            "ANSI_949": "euc_kr",
-            "ANSI_1252": "cp1252",
-            "ANSI_1250": "cp1250",
-            "ANSI_1251": "cp1251",
+            # AutoCAD code pages -> Python encoding
+            "ANSI_874": "cp874",      # Thai
+            "ANSI_932": "shift_jis",  # Japanese
+            "ANSI_936": "gbk",        # Chinese Simplified
+            "ANSI_949": "euc_kr",     # Korean
+            "ANSI_950": "big5",       # Chinese Traditional
+            "ANSI_1250": "cp1250",    # Central/Eastern Europe
+            "ANSI_1251": "cp1251",    # Cyrillic
+            "ANSI_1252": "cp1252",    # Western Europe
+            "ANSI_1253": "cp1253",    # Greek
+            "ANSI_1254": "cp1254",    # Turkish
+            "ANSI_1255": "cp1255",    # Hebrew
+            "ANSI_1256": "cp1256",    # Arabic
+            "ANSI_1257": "cp1257",    # Baltic
+            "ANSI_1258": "cp1258",    # Vietnamese
+            "UTF-8": "utf-8",
+            "UTF8": "utf-8",
+            "GB2312": "gbk",
+            "BIG5": "big5",
+            "SHIFT_JIS": "shift_jis",
+            "EUC_KR": "euc_kr",
         }
         try:
             with open(filepath, "rb") as f:
@@ -180,16 +196,24 @@ class DxfReader:
                 m = re.search(rb"\n\s*3\s*\n\s*(\S+)", head[idx:])
                 if m:
                     codepage = m.group(1).decode("ascii").strip()
-                    return cp_map.get(codepage, "utf-8")
+                    if codepage in cp_map:
+                        return cp_map[codepage]
+                    # Try numeric code page
+                    try:
+                        return "cp" + str(int(codepage))
+                    except ValueError:
+                        pass
         except Exception:
             pass
-        # Try gbk first (covers Chinese DXF), then utf-8
-        try:
-            with open(filepath, "r", encoding="gbk") as f:
-                f.read(1024)
-            return "gbk"
-        except Exception:
-            return "utf-8"
+        # Auto-detect: try encodings in order of likelihood
+        for enc in ("gbk", "gb18030", "shift_jis", "euc_kr", "utf-8"):
+            try:
+                with open(filepath, "r", encoding=enc) as f:
+                    f.read(4096)
+                return enc
+            except Exception:
+                continue
+        return "utf-8"
 
     def read(self, filepath: str) -> list[DxfEntity]:
         """Parse a DXF file and return all recognized entities."""

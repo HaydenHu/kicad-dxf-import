@@ -1,6 +1,6 @@
 # KiCad DXF Import Plugin
 
-A KiCad 10.0+ PCB action plugin that imports DXF files (AutoCAD R12-R2013) directly into the board editor.
+A KiCad 10.0+ PCB action plugin that imports DXF files (AutoCAD R12-R2018+) directly into the board editor.
 
 ## Features
 
