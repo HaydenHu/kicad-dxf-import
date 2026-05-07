@@ -251,14 +251,10 @@ class DxfReader:
 
     def _parse_section(self, name: str, idx: int) -> int:
         """Dispatch to the appropriate section parser."""
-        if name == "ENTITIES":
+        if name == "ENTITIES" or name == "BLOCKS":
             return self._parse_entities(idx)
         elif name == "TABLES":
             return self._parse_tables(idx)
-        elif name == "BLOCKS":
-            return self._skip_section(idx)
-        elif name == "OBJECTS":
-            return self._skip_section(idx)
         else:
             return self._skip_section(idx)
 
