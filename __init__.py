@@ -74,7 +74,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
 
     def __init__(self):
         super().__init__()
-        self.name = "Import DXF"
+        self.name = "Import DXF 1.0"
         self.category = "Import"
         self.description = (
             "Import DXF files (AutoCAD/R12-R2013) into the current PCB. "
