@@ -23,7 +23,7 @@ from typing import Any
 import pcbnew
 import wx
 
-from dxf_reader import (
+from .dxf_reader import (
     DxfArc,
     DxfCircle,
     DxfEllipse,
