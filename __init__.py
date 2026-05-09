@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import math
 import os
+import sys
 from typing import Any
 
 import pcbnew
@@ -556,39 +557,45 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
 
     # ── Dimension / Leader ───────────────────────────────────
 
-    def _add_dimension(self, e: DxfDimension, width_nm: int) -> bool:
+    def _add_dimension(self, e, width_nm: int) -> bool:
         """Add DXF DIMENSION as KiCad native dimension element."""
-        sx = self._to_board_coord(e.x_start)
-        sy = self._to_board_coord(e.y_start)
-        ex = self._to_board_coord(e.x_end)
-        ey = self._to_board_coord(e.y_end)
+        try:
+            sx = self._to_board_coord(e.x_start)
+            sy = self._to_board_coord(e.y_start)
+            ex = self._to_board_coord(e.x_end)
+            ey = self._to_board_coord(e.y_end)
 
-        if e.dim_type == "DIAMETRIC":
-            dim = pcbnew.PCB_DIM_RADIAL(self.board)
-        else:
-            dim = pcbnew.PCB_DIM_ALIGNED(self.board)
-            mx = (e.x_start + e.x_end) / 2.0
-            my = (e.y_start + e.y_end) / 2.0
-            h = int(math.hypot(
-                self._to_board_coord(e.x_text - mx),
-                self._to_board_coord(e.y_text - my),
-            ))
-            dx = e.x_end - e.x_start
-            dy = e.y_end - e.y_start
-            cross = dx * (e.y_text - my) - dy * (e.x_text - mx)
-            if cross < 0:
-                h = -h
-            dim.SetHeight(h)
+            if hasattr(e, 'dim_type') and e.dim_type == "DIAMETRIC":
+                dim = pcbnew.PCB_DIM_RADIAL(self.board)
+            else:
+                dim = pcbnew.PCB_DIM_ALIGNED(self.board)
+                mx = (e.x_start + e.x_end) / 2.0
+                my = (e.y_start + e.y_end) / 2.0
+                h = int(math.hypot(
+                    self._to_board_coord(e.x_text - mx),
+                    self._to_board_coord(e.y_text - my),
+                ))
+                dx = e.x_end - e.x_start
+                dy = e.y_end - e.y_start
+                cross = dx * (e.y_text - my) - dy * (e.x_text - mx)
+                if cross < 0:
+                    h = -h
+                dim.SetHeight(h)
 
-        dim.SetStart(pcbnew.VECTOR2I(sx, sy))
-        dim.SetEnd(pcbnew.VECTOR2I(ex, ey))
-        dim.SetLayer(self.target_layer_id)
-        if e.text:
-            dim.SetOverrideText(e.text)
-            dim.SetOverrideTextEnabled(True)
-        self._apply_font_props(dim, e.font_props)
-        self.board.Add(dim)
-        return True
+            dim.SetStart(pcbnew.VECTOR2I(sx, sy))
+            dim.SetEnd(pcbnew.VECTOR2I(ex, ey))
+            dim.SetLayer(self.target_layer_id)
+            if e.text:
+                dim.SetOverrideText(e.text)
+                dim.SetOverrideTextEnabled(True)
+            self._apply_font_props(dim, getattr(e, 'font_props', {}))
+            self.board.Add(dim)
+            return True
+        except Exception as ex:
+            print(f"DXF: _add_dimension failed: {ex}", file=sys.stderr)
+            import traceback
+            traceback.print_exc(file=sys.stderr)
+            return False
 
     def _add_leader(self, e: DxfLeader, width_nm: int) -> bool:
         """Add DXF LEADER as KiCad PCB_DIM_LEADER element."""
