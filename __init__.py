@@ -558,6 +558,15 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         230: (255, 43, 170), 240: (255, 0, 170),   250: (128, 128, 128),
     }
 
+    # DXF font name -> system font name mapping
+    _FONT_NAME_MAP = {
+        "SimSun": "宋体",
+        "SimHei": "黑体",
+        "KaiTi": "楷体",
+        "FangSong": "仿宋",
+        "Microsoft YaHei": "微软雅黑",
+    }
+
     @staticmethod
     def _apply_font_props(txt: pcbnew.PCB_TEXT, props: dict) -> None:
         """Apply extracted font properties to PCB_TEXT."""
@@ -565,7 +574,10 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             return
         if props.get("name"):
             try:
-                txt.SetUnresolvedFontName(props["name"])
+                font_name = props["name"]
+                # Map DXF font names to system font names
+                font_name = DxfImportPlugin._FONT_NAME_MAP.get(font_name, font_name)
+                txt.SetUnresolvedFontName(font_name)
                 emb = txt.GetEmbeddedFonts()
                 txt.ResolveFont(emb)
             except Exception:
