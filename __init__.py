@@ -39,6 +39,8 @@ from .dxf_reader import (
     polyline_points_from_bulges,
     spline_to_polyline,
 )
+# Helper for font-aware text cleaning
+_clean_mtext_ex = DxfReader._clean_mtext_ex
 
 
 # ── Constants ───────────────────────────────────────────────────
@@ -409,6 +411,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             pcbnew.GR_TEXT_V_ALIGN_TOP if e.valign == 3 else
             pcbnew.GR_TEXT_V_ALIGN_BOTTOM
         )
+        self._apply_font(txt, e.font_name)
         self.board.Add(txt)
         return True
 
@@ -435,6 +438,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             pcbnew.GR_TEXT_V_ALIGN_BOTTOM if ap in (7, 8, 9) else
             pcbnew.GR_TEXT_V_ALIGN_CENTER
         )
+        self._apply_font(txt, e.font_name)
         self.board.Add(txt)
         return True
 
@@ -530,6 +534,17 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             self.board.Add(shape)
 
         return True
+
+    # ── Font helper ──────────────────────────────────────────
+
+    @staticmethod
+    def _apply_font(txt: pcbnew.PCB_TEXT, font_name: str) -> None:
+        """Try to set the TrueType font on a PCB_TEXT. Silently ignore if unavailable."""
+        if font_name:
+            try:
+                txt.SetUnresolvedFontName(font_name)
+            except Exception:
+                pass  # Font not available on this system
 
     # ── Layer helpers ─────────────────────────────────────────
 
