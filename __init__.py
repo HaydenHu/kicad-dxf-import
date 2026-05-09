@@ -549,43 +549,30 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
 
     def _add_dimension(self, e: DxfDimension, width_nm: int) -> bool:
         """Add DXF DIMENSION as KiCad native dimension element."""
+        sx = self._to_board_coord(e.x_start)
+        sy = self._to_board_coord(e.y_start)
+        ex = self._to_board_coord(e.x_end)
+        ey = self._to_board_coord(e.y_end)
+
         if e.dim_type == "DIAMETRIC":
             dim = pcbnew.PCB_DIM_RADIAL(self.board)
-            dim.SetStart(pcbnew.VECTOR2I(
-                self._to_board_coord(e.x_start),
-                self._to_board_coord(e.y_start),
-            ))
-            dim.SetEnd(pcbnew.VECTOR2I(
-                self._to_board_coord(e.x_end),
-                self._to_board_coord(e.y_end),
-            ))
         else:
             dim = pcbnew.PCB_DIM_ALIGNED(self.board)
-            # DXF: 13,23 = measurement point 1, 14,24 = measurement point 2
-            # 10,20 = text position (dimension line position)
-            # height = distance from measurement line to dimension line
-            dim.SetStart(pcbnew.VECTOR2I(
-                self._to_board_coord(e.x_start),
-                self._to_board_coord(e.y_start),
-            ))
-            dim.SetEnd(pcbnew.VECTOR2I(
-                self._to_board_coord(e.x_end),
-                self._to_board_coord(e.y_end),
-            ))
-            # Calculate height: distance from text position to measurement line midpoint
             mx = (e.x_start + e.x_end) / 2.0
             my = (e.y_start + e.y_end) / 2.0
-            height = self._to_board_coord(
-                math.hypot(e.x_text - mx, e.y_text - my)
-            )
-            # Determine sign: cross product to know which side text is on
+            h = int(math.hypot(
+                self._to_board_coord(e.x_text - mx),
+                self._to_board_coord(e.y_text - my),
+            ))
             dx = e.x_end - e.x_start
             dy = e.y_end - e.y_start
             cross = dx * (e.y_text - my) - dy * (e.x_text - mx)
             if cross < 0:
-                height = -height
-            dim.SetHeight(height)
+                h = -h
+            dim.SetHeight(h)
 
+        dim.SetStart(pcbnew.VECTOR2I(sx, sy))
+        dim.SetEnd(pcbnew.VECTOR2I(ex, ey))
         dim.SetLayer(self.target_layer_id)
         if e.text:
             dim.SetOverrideText(e.text)
