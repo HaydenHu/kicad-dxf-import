@@ -292,9 +292,9 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                     added = self._add_ellipse(entity, w_nm)
                 elif isinstance(entity, DxfSpline):
                     added = self._add_spline(entity, w_nm)
-                elif isinstance(entity, DxfDimension):
+                elif entity.entity_type == "DIMENSION":
                     added = self._add_dimension(entity, w_nm)
-                elif isinstance(entity, DxfLeader):
+                elif entity.entity_type == "LEADER":
                     added = self._add_leader(entity, w_nm)
 
                 if added:
