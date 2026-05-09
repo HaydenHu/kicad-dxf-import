@@ -610,16 +610,28 @@ class DxfReader:
     def _clean_mtext(text: str) -> str:
         """Remove DXF MTEXT formatting codes while preserving CJK text."""
         import re
-        # Handle \P paragraph break BEFORE removing format codes
+
+        # Handle \\P paragraph break before format code removal
         text = text.replace("\x5cP", "\n").replace("\x0cP", "\n")
 
-        # Handle \S stack: upper^lower; or upper/lower; -> keep upper
-        text = re.sub(r"[\x0c\x5c]S([^/^;]*)[/^][^;]*;", r"\1", text)
+        # Unified format code removal with callback
+        def _replace_code(m):
+            full = m.group(0)
+            leader = full[0]   # \x0c, \x03, or backslash
+            letter = full[1]   # A-Za-z
+            inner = full[2:-1]  # content between letter and ;
 
-        # Remove all other format codes: \<letter><anything except ;>;
-        text = re.sub(r"[\x03\x0c\x5c][A-Za-z][^;]*;", "", text)
+            # \x0cS or \x03S = \\f font tag starting with S, not \\S stack
+            if leader != "\x5c" and letter == "S":
+                return ""
+            # \\Sxxx; or \\Supper^lower; -> keep content
+            if leader == "\x5c" and letter == "S":
+                if "^" in inner:
+                    return inner.split("^")[0]
+                return inner
+            return ""
 
-        # Remove formatting braces and specials
+        text = re.sub(r"[\x03\x0c\x5c][A-Za-z][^;]*;", _replace_code, text)
         text = text.replace("{", "").replace("}", "")
         text = text.replace("\x5c~", " ")
         return text.strip()
