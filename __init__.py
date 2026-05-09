@@ -649,7 +649,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
 
             if hasattr(e, 'dim_type') and e.dim_type == "DIAMETRIC":
                 dim = pcbnew.PCB_DIM_RADIAL(self.board)
-                dim.SetPrefix("")  # Remove default "R " prefix
+                dim.SetPrefix("\u00F8")  # Diameter symbol
             else:
                 dx = abs(e.x_end - e.x_start)
                 dy = abs(e.y_end - e.y_start)
