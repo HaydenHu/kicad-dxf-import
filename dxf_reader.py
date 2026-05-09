@@ -632,6 +632,23 @@ class DxfReader:
             return ""
 
         text = re.sub(r"[\x03\x0c\x5c][A-Za-z][^;]*;", _replace_code, text)
+
+        # Handle \\U+XXXX Unicode escapes (e.g. \\U+2205 = diameter symbol)
+        idx = 0
+        while True:
+            idx = text.find("\x5cU+", idx)
+            if idx < 0:
+                break
+            hex_start = idx + 3
+            if hex_start + 4 <= len(text):
+                try:
+                    codepoint = int(text[hex_start:hex_start + 4], 16)
+                    text = text[:idx] + chr(codepoint) + text[hex_start + 4:]
+                except (ValueError, OverflowError):
+                    idx += 1
+            else:
+                idx += 1
+
         text = text.replace("{", "").replace("}", "")
         text = text.replace("\x5c~", " ")
         return text.strip()
