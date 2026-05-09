@@ -138,6 +138,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             return
 
         # Step 5: Force board update and refresh
+        self.board.IncrementTimestamp()
         pcbnew.Refresh()
 
         dim_info = ""
@@ -633,7 +634,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                     self._to_board_coord(e.y_tip),
                 ))
             # Enable text override so we can set text later
-            dim.SetOverrideTextEnabled(True)
+            dim.SetOverrideText("\n")
 
             self.board.Add(dim)
             self._leaders_added = getattr(self, '_leaders_added', 0) + 1
