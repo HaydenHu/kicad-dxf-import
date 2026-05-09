@@ -126,19 +126,28 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         if not self._show_settings_dialog(entities):
             return  # user cancelled
 
-        # Step 4: Collect dim/leader positions to skip nearby MTEXT imports
-        dim_positions: list[tuple[float, float]] = []
+        # Step 4: Collect dim/leader points to skip nearby MTEXT/LINE imports
+        dim_points: set[tuple] = set()
         if self._native_dims:
             for e in entities:
                 if e.entity_type == "DIMENSION":
-                    dim_positions.append((e.x_text, e.y_text))
-                    dim_positions.append((e.x_mid, e.y_mid))
+                    dim_points.add((round(e.x_text, 2), round(e.y_text, 2)))
+                    dim_points.add((round(e.x_mid, 2), round(e.y_mid, 2)))
+                    dim_points.add((round(e.x_start, 2), round(e.y_start, 2)))
+                    dim_points.add((round(e.x_end, 2), round(e.y_end, 2)))
                 elif e.entity_type == "LEADER":
                     hooks = getattr(e, 'hooks', [])
                     if hooks:
-                        dim_positions.append(hooks[0])
+                        dim_points.add((round(hooks[0][0], 2), round(hooks[0][1], 2)))
+                        dim_points.add((round(hooks[-1][0], 2), round(hooks[-1][1], 2)))
 
-        count = self._import_entities(entities, dim_positions)
+        def _near_dim_point(px, py):
+            for dx, dy in dim_points:
+                if abs(px - dx) < 5.0 and abs(py - dy) < 5.0:
+                    return True
+            return False
+
+        count = self._import_entities(entities, _near_dim_point)
 
         # Debug: check entity types
         type_counts = {}
@@ -149,9 +158,8 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             self._show_info("The DXF file contains no supported entities.")
             return
 
-        # Step 5: Force board update and refresh
+        # Step 5: Refresh the board view
         pcbnew.Refresh()
-        pcbnew.UpdateUserInterface()
 
         dim_info = ""
         if hasattr(self, '_dimensions_added'):
@@ -338,23 +346,21 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
 
     # ── Entity to board conversion ───────────────────────────
 
-    def _import_entities(self, entities: list[DxfEntity], dim_positions: list = None) -> int:
+    def _import_entities(self, entities: list[DxfEntity], near_dim=None) -> int:
         count = 0
         w_nm = int(self._line_width * 1_000_000)
 
         for entity in entities:
             try:
-                # Skip MTEXT/TEXT near dimension text positions when using native dims
-                if dim_positions and entity.entity_type in ("MTEXT", "TEXT"):
-                    ex = getattr(entity, 'x', None)
-                    ey = getattr(entity, 'y', None)
-                    skip = False
-                    if ex is not None:
-                        for dx, dy in dim_positions:
-                            if abs(ex - dx) < 5.0 and abs(ey - dy) < 5.0:
-                                skip = True
-                                break
-                    if skip:
+                # Skip entities near dimension points when using native dims
+                if near_dim and entity.entity_type in ("MTEXT", "TEXT"):
+                    if near_dim(round(getattr(entity, 'x', 0), 2),
+                                round(getattr(entity, 'y', 0), 2)):
+                        continue
+
+                if near_dim and entity.entity_type == "LINE":
+                    if (near_dim(round(entity.x1, 2), round(entity.y1, 2)) and
+                        near_dim(round(entity.x2, 2), round(entity.y2, 2))):
                         continue
 
                 added = False
