@@ -95,6 +95,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         self.dxf_file: str = ""
         self._line_width: float = 0.1
         self._text_layer_id: int = pcbnew.Eco1_User
+        self._native_dims: bool = True  # Use KiCad native dimensions by default
 
     def Run(self) -> None:
         """Entry point called by KiCad when the plugin action is invoked."""
@@ -245,6 +246,16 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         width_sizer.Add(width_text, 0, wx.LEFT, 10)
         sizer.Add(width_sizer, 0, wx.BOTTOM, 10)
 
+        # Native dimensions checkbox
+        native_cb = wx.CheckBox(panel, label="Use KiCad native dimensions (DIMENSION/LEADER)")
+        native_cb.SetValue(True)
+        native_cb.SetToolTip(
+            "When checked, DXF DIMENSION and LEADER entities are converted "
+            "to KiCad native dimension objects. When unchecked, they remain "
+            "as plain lines and text."
+        )
+        sizer.Add(native_cb, 0, wx.LEFT | wx.RIGHT, 10)
+
         # Buttons
         btn_sizer = wx.StdDialogButtonSizer()
         ok_btn = wx.Button(panel, wx.ID_OK, "Import")
@@ -276,6 +287,8 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                 self._line_width = max(0, float(width_text.GetValue()))
             except ValueError:
                 self._line_width = 0.1
+
+            self._native_dims = native_cb.GetValue()
 
             dlg.Destroy()
             return True
@@ -311,9 +324,12 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                 elif isinstance(entity, DxfSpline):
                     added = self._add_spline(entity, w_nm)
                 elif entity.entity_type == "DIMENSION":
-                    added = self._add_dimension(entity, w_nm)
+                    if self._native_dims:
+                        added = self._add_dimension(entity, w_nm)
+                    # If native dims disabled, skip (keep LINE+TEXT representation)
                 elif entity.entity_type == "LEADER":
-                    added = self._add_leader(entity, w_nm)
+                    if self._native_dims:
+                        added = self._add_leader(entity, w_nm)
 
                 if added:
                     count += 1
