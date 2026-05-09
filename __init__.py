@@ -566,6 +566,8 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         if props.get("name"):
             try:
                 txt.SetUnresolvedFontName(props["name"])
+                emb = txt.GetEmbeddedFonts()
+                txt.ResolveFont(emb)
             except Exception:
                 pass
         if "bold" in props:
