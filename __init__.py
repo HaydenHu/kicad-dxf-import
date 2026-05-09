@@ -358,14 +358,6 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                                 round(getattr(entity, 'y', 0), 2)):
                         continue
 
-                if near_dim and entity.entity_type == "LINE":
-                    # Only skip short lines (dimension/extension lines typically < 20mm)
-                    import math as _math
-                    line_len = _math.hypot(entity.x2 - entity.x1, entity.y2 - entity.y1)
-                    if line_len < 20.0 and (near_dim(round(entity.x1, 2), round(entity.y1, 2)) and
-                        near_dim(round(entity.x2, 2), round(entity.y2, 2))):
-                        continue
-
                 added = False
                 if isinstance(entity, DxfLine):
                     added = self._add_line(entity, w_nm)
