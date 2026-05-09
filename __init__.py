@@ -644,16 +644,29 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                 dim = pcbnew.PCB_DIM_RADIAL(self.board)
                 dim.SetPrefix("")  # Remove default "R " prefix
             else:
-                dim = pcbnew.PCB_DIM_ALIGNED(self.board)
-                # Height: distance from measurement line midpoint to text position
+                dx = abs(e.x_end - e.x_start)
+                dy = abs(e.y_end - e.y_start)
+                # Nearly pure H/V (< 1mm perpendicular) -> ALIGNED
+                # Clearly angled both axes -> ORTHOGONAL
+                if dx < 1.0 or dy < 1.0:
+                    dim = pcbnew.PCB_DIM_ALIGNED(self.board)
+                else:
+                    dim = pcbnew.PCB_DIM_ORTHOGONAL(self.board)
                 mx = (e.x_start + e.x_end) / 2.0
                 my = (e.y_start + e.y_end) / 2.0
                 h = self._to_board_coord(
                     math.hypot(e.x_text - mx, e.y_text - my)
                 )
-                if (e.x_end - e.x_start) * (e.y_text - my) - \
-                   (e.y_end - e.y_start) * (e.x_text - mx) < 0:
-                    h = -h
+                # Direction for ORTHOGONAL: need per-axis logic
+                if dim.__class__.__name__ == "PCB_DIM_ORTHOGONAL":
+                    if dx > dy:
+                        h = self._to_board_coord(e.y_text - my)
+                    else:
+                        h = self._to_board_coord(e.x_text - mx)
+                else:
+                    if (e.x_end - e.x_start) * (e.y_text - my) - \
+                       (e.y_end - e.y_start) * (e.x_text - mx) < 0:
+                        h = -h
                 dim.SetHeight(h)
 
             dim.SetStart(pcbnew.VECTOR2I(sx, sy))
