@@ -164,6 +164,9 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             dim_info += f"\nUnhandled types:\n{self._unknown_types}"
         if hasattr(self, '_leader_hooks_debug') and self._leader_hooks_debug:
             dim_info += f"\nLeader debug:\n{self._leader_hooks_debug[:300]}"
+        leader_errs = getattr(self, '_leader_errors', '')
+        if leader_errs:
+            dim_info += f"\nLeader errors:\n{leader_errs[:400]}"
         if hasattr(self, '_dim_errors') and self._dim_errors:
             dim_info += f"\nErrors:\n{self._dim_errors[:500]}"
 
@@ -714,17 +717,6 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             msg = f"Leader add failed:\n{traceback.format_exc()}"
             self._dim_errors = getattr(self, '_dim_errors', "") + msg + "\n---\n"
             return False
-
-    def _add_leader(self, e: DxfLeader, width_nm: int) -> bool:
-        """Add DXF LEADER as KiCad PCB_DIM_LEADER element."""
-        dim = pcbnew.PCB_DIM_LEADER(self.board)
-        dim.SetLayer(self.target_layer_id)
-        dim.SetEnd(pcbnew.VECTOR2I(
-            self._to_board_coord(e.x_tip),
-            self._to_board_coord(e.y_tip),
-        ))
-        self.board.Add(dim)
-        return True
 
     # ── Font helper ──────────────────────────────────────────
 
