@@ -645,10 +645,9 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             if hasattr(e, 'dim_type') and e.dim_type == "DIAMETRIC":
                 dim = pcbnew.PCB_DIM_RADIAL(self.board)
                 dim.SetPrefix("")  # Remove default "R " prefix
-            elif abs(e.x_end - e.x_start) < 1.0 or abs(e.y_end - e.y_start) < 1.0:
-                dim = pcbnew.PCB_DIM_ORTHOGONAL(self.board)
             else:
-                dim = pcbnew.PCB_DIM_ALIGNED(self.board)
+                # Use ORTHOGONAL for all linear dimensions
+                dim = pcbnew.PCB_DIM_ORTHOGONAL(self.board)
                 mx = (e.x_start + e.x_end) / 2.0
                 my = (e.y_start + e.y_end) / 2.0
                 h = int(math.hypot(
