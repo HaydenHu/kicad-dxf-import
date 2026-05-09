@@ -350,7 +350,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                     skip = False
                     if ex is not None:
                         for dx, dy in dim_positions:
-                            if abs(ex - dx) < 0.5 and abs(ey - dy) < 0.5:
+                            if abs(ex - dx) < 5.0 and abs(ey - dy) < 5.0:
                                 skip = True
                                 break
                     if skip:
