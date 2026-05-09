@@ -96,6 +96,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         self._line_width: float = 0.1
         self._text_layer_id: int = pcbnew.Eco1_User
         self._native_dims: bool = True  # Use KiCad native dimensions by default
+        self._dim_layer_id: int = pcbnew.Dwgs_User  # Layer for native dimensions
 
     def Run(self) -> None:
         """Entry point called by KiCad when the plugin action is invoked."""
@@ -267,6 +268,17 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         )
         sizer.Add(native_cb, 0, wx.LEFT | wx.RIGHT, 10)
 
+        # Dimension layer
+        dim_layer_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        dim_layer_sizer.Add(wx.StaticText(panel, label="Dimension layer:"), 0,
+                            wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 10)
+        dim_layer_choice = wx.Choice(panel, choices=LAYER_CHOICES)
+        # Default: Dwgs.User (User.Drawings)
+        dwgs_idx = LAYER_CHOICES.index("Dwgs.User") if "Dwgs.User" in LAYER_CHOICES else 0
+        dim_layer_choice.SetSelection(dwgs_idx)
+        dim_layer_sizer.Add(dim_layer_choice, 0, wx.LEFT, 10)
+        sizer.Add(dim_layer_sizer, 0, wx.BOTTOM, 10)
+
         # Buttons
         btn_sizer = wx.StdDialogButtonSizer()
         ok_btn = wx.Button(panel, wx.ID_OK, "Import")
@@ -300,6 +312,15 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                 self._line_width = 0.1
 
             self._native_dims = native_cb.GetValue()
+
+            dim_target_name = LAYER_CHOICES[dim_layer_choice.GetSelection()]
+            self._dim_layer_id = self._get_layer_id(dim_target_name)
+
+            # Map unit choice to KiCad DIM units
+            dim_units = [pcbnew.DIM_UNITS_MODE_MM, pcbnew.DIM_UNITS_MODE_INCH,
+                         pcbnew.DIM_UNITS_MODE_MILS, pcbnew.DIM_UNITS_MODE_MM,
+                         pcbnew.DIM_UNITS_MODE_MM]
+            self._dim_units_mode = dim_units[unit_choice.GetSelection()]
 
             dlg.Destroy()
             return True
@@ -630,8 +651,8 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                 self._to_board_coord(e.x_text),
                 self._to_board_coord(e.y_text),
             ))
-            dim.SetLayer(self.target_layer_id)
-            dim.SetUnitsMode(pcbnew.DIM_UNITS_MODE_MM)
+            dim.SetLayer(self._dim_layer_id)
+            dim.SetUnitsMode(self._dim_units_mode)
             dim.SetUnitsFormat(pcbnew.DIM_UNITS_FORMAT_NO_SUFFIX)
             if e.text:
                 dim.SetOverrideText(e.text)
@@ -650,7 +671,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         """Add DXF LEADER as KiCad PCB_DIM_LEADER element."""
         try:
             dim = pcbnew.PCB_DIM_LEADER(self.board)
-            dim.SetLayer(self.target_layer_id)
+            dim.SetLayer(self._dim_layer_id)
 
             hooks = getattr(e, 'hooks', [])
             if len(hooks) >= 2:
