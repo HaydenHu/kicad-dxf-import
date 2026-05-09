@@ -884,14 +884,16 @@ class DxfReader:
         idx, attrs = self._read_attrs(idx)
         leader = DxfLeader(**attrs)
         hooks: list[tuple[float, float]] = []
+        current_x: float | None = None
         while idx < len(self._tokens):
             code, value = self._tokens[idx]
             if code == 0:
                 break
             if code == 10:
-                leader.x_tip = float(value)
-            elif code == 20:
-                leader.y_tip = float(value)
+                current_x = float(value)
+            elif code == 20 and current_x is not None:
+                hooks.append((current_x, float(value)))
+                current_x = None
             elif code == 211:
                 hooks.append((float(value), 0.0))
             elif code == 221:

@@ -592,6 +592,10 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
 
             dim.SetStart(pcbnew.VECTOR2I(sx, sy))
             dim.SetEnd(pcbnew.VECTOR2I(ex, ey))
+            dim.SetTextPos(pcbnew.VECTOR2I(
+                self._to_board_coord(e.x_text),
+                self._to_board_coord(e.y_text),
+            ))
             dim.SetLayer(self.target_layer_id)
             if e.text:
                 dim.SetOverrideText(e.text)
@@ -611,10 +615,25 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         try:
             dim = pcbnew.PCB_DIM_LEADER(self.board)
             dim.SetLayer(self.target_layer_id)
-            dim.SetEnd(pcbnew.VECTOR2I(
-                self._to_board_coord(e.x_tip),
-                self._to_board_coord(e.y_tip),
-            ))
+
+            hooks = getattr(e, 'hooks', [])
+            if len(hooks) >= 2:
+                # hooks[0] = text/start point, hooks[-1] = arrow tip
+                dim.SetTextPos(pcbnew.VECTOR2I(
+                    self._to_board_coord(hooks[0][0]),
+                    self._to_board_coord(hooks[0][1]),
+                ))
+                dim.SetEnd(pcbnew.VECTOR2I(
+                    self._to_board_coord(hooks[-1][0]),
+                    self._to_board_coord(hooks[-1][1]),
+                ))
+            else:
+                # Fallback: use x_tip/y_tip as arrow tip
+                dim.SetEnd(pcbnew.VECTOR2I(
+                    self._to_board_coord(e.x_tip),
+                    self._to_board_coord(e.y_tip),
+                ))
+
             self.board.Add(dim)
             self._leaders_added = getattr(self, '_leaders_added', 0) + 1
             return True
