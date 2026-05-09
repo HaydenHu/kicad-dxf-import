@@ -400,6 +400,8 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         size = self._to_board_coord(e.height)
         txt.SetTextSize(pcbnew.VECTOR2I(size, size))
         txt.SetTextAngle(pcbnew.EDA_ANGLE(e.rotation, pcbnew.DEGREES_T))
+        if "\n" in e.text:
+            txt.SetMultilineAllowed(True)
 
         txt.SetHorizJustify(
             pcbnew.GR_TEXT_H_ALIGN_CENTER if e.halign == 1 else
@@ -426,6 +428,8 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         size = self._to_board_coord(e.height)
         txt.SetTextSize(pcbnew.VECTOR2I(size, size))
         txt.SetTextAngle(pcbnew.EDA_ANGLE(e.rotation, pcbnew.DEGREES_T))
+        if "\n" in e.text:
+            txt.SetMultilineAllowed(True)
 
         ap = e.attachment_point
         txt.SetHorizJustify(
