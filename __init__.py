@@ -95,9 +95,8 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         self.dxf_file: str = ""
         self._line_width: float = 0.1
         self._text_layer_id: int = pcbnew.Eco1_User
-        self._native_dims: bool = False  # Native dimensions off by default
-        self._dim_layer_id: int = pcbnew.Cmts_User  # Layer for native dimensions
-        self._leaders_seen: int = 0
+        self._native_dims: bool = False
+        self._dim_layer_id: int = pcbnew.Cmts_User
 
     def Run(self) -> None:
         """Entry point called by KiCad when the plugin action is invoked."""
@@ -126,62 +125,32 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         if not self._show_settings_dialog(entities):
             return  # user cancelled
 
-        # Step 4: Collect dim/leader points to skip nearby MTEXT/LINE imports
-        dim_points: set[tuple] = set()
+        # Collect dim/leader text positions for MTEXT dedup when native dims enabled
+        dim_points = set()
         if self._native_dims:
             for e in entities:
                 if e.entity_type == "DIMENSION":
+                    for val in (e.x_text, e.y_text, e.x_mid, e.y_mid, e.x_start, e.y_start, e.x_end, e.y_end):
+                        pass  # Points collected below in one pass
                     dim_points.add((round(e.x_text, 2), round(e.y_text, 2)))
                     dim_points.add((round(e.x_mid, 2), round(e.y_mid, 2)))
-                    dim_points.add((round(e.x_start, 2), round(e.y_start, 2)))
-                    dim_points.add((round(e.x_end, 2), round(e.y_end, 2)))
                 elif e.entity_type == "LEADER":
-                    hooks = getattr(e, 'hooks', [])
+                    hooks = e.hooks if hasattr(e, 'hooks') else []
                     if hooks:
                         dim_points.add((round(hooks[0][0], 2), round(hooks[0][1], 2)))
-                        dim_points.add((round(hooks[-1][0], 2), round(hooks[-1][1], 2)))
 
-        def _near_dim_point(px, py):
-            for dx, dy in dim_points:
-                if abs(px - dx) < 5.0 and abs(py - dy) < 5.0:
-                    return True
-            return False
+        count = self._import_entities(entities, dim_points)
 
-        count = self._import_entities(entities, _near_dim_point)
-
-        # Debug: check entity types
-        type_counts = {}
-        for e in entities:
-            t = e.entity_type
-            type_counts[t] = type_counts.get(t, 0) + 1
         if count == 0:
             self._show_info("The DXF file contains no supported entities.")
             return
 
-        # Step 5: Refresh the board view
         pcbnew.Refresh()
-
-        dim_info = ""
-        if hasattr(self, '_dimensions_added'):
-            dim_info += f"\nDimensions: {self._dimensions_added}"
-        dim_info += f"\nLeaders seen: {self._leaders_seen}"
-        if hasattr(self, '_leaders_added'):
-            dim_info += f", added: {self._leaders_added}"
-        if hasattr(self, '_unknown_types') and self._unknown_types:
-            dim_info += f"\nUnhandled types:\n{self._unknown_types}"
-        if hasattr(self, '_leader_hooks_debug') and self._leader_hooks_debug:
-            dim_info += f"\nLeader debug:\n{self._leader_hooks_debug[:300]}"
-        leader_errs = getattr(self, '_leader_errors', '')
-        if leader_errs:
-            dim_info += f"\nLeader errors:\n{leader_errs[:400]}"
-        if hasattr(self, '_dim_errors') and self._dim_errors:
-            dim_info += f"\nErrors:\n{self._dim_errors[:500]}"
 
         self._show_info(
             f"Successfully imported {count} entities from DXF.\n"
             f"File: {os.path.basename(self.dxf_file)}\n"
-            f"Layer: {self._layer_name_from_id(self.target_layer_id)}\n"
-            f"Types: {type_counts}{dim_info}"
+            f"Layer: {self._layer_name_from_id(self.target_layer_id)}"
         )
 
     # ── Dialogs ──────────────────────────────────────────────
@@ -346,50 +315,41 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
 
     # ── Entity to board conversion ───────────────────────────
 
-    def _import_entities(self, entities: list[DxfEntity], near_dim=None) -> int:
+    def _import_entities(self, entities: list[DxfEntity], dim_points: set = None) -> int:
         count = 0
         w_nm = int(self._line_width * 1_000_000)
 
         for entity in entities:
             try:
-                # Skip entities near dimension points when using native dims
-                if near_dim and entity.entity_type in ("MTEXT", "TEXT"):
-                    if near_dim(round(getattr(entity, 'x', 0), 2),
-                                round(getattr(entity, 'y', 0), 2)):
+                if dim_points and entity.entity_type in ("MTEXT", "TEXT"):
+                    pt = (round(entity.x, 2), round(entity.y, 2))
+                    if pt in dim_points:
                         continue
 
                 added = False
-                if isinstance(entity, DxfLine):
+                et = entity.entity_type
+                if et == "LINE":
                     added = self._add_line(entity, w_nm)
-                elif isinstance(entity, DxfCircle):
+                elif et == "CIRCLE":
                     added = self._add_circle(entity, w_nm)
-                elif isinstance(entity, DxfArc):
+                elif et == "ARC":
                     added = self._add_arc(entity, w_nm)
-                elif isinstance(entity, DxfLwPolyline):
+                elif et == "LWPOLYLINE":
                     added = self._add_lwpolyline(entity, w_nm)
-                elif isinstance(entity, DxfPolyline):
+                elif et == "POLYLINE":
                     added = self._add_polyline(entity, w_nm)
-                elif isinstance(entity, DxfText):
+                elif et == "TEXT":
                     added = self._add_text(entity)
-                elif isinstance(entity, DxfMText):
+                elif et == "MTEXT":
                     added = self._add_mtext(entity)
-                elif isinstance(entity, DxfEllipse):
+                elif et == "ELLIPSE":
                     added = self._add_ellipse(entity, w_nm)
-                elif isinstance(entity, DxfSpline):
+                elif et == "SPLINE":
                     added = self._add_spline(entity, w_nm)
-                elif entity.entity_type == "DIMENSION":
-                    if self._native_dims:
-                        added = self._add_dimension(entity, w_nm)
-                    # Skip DIMENSION entity entirely (text is inline, lines are separate)
-                elif entity.entity_type == "LEADER":
-                    if self._native_dims:
-                        added = self._add_leader(entity, w_nm)
-                    self._leaders_seen = getattr(self, '_leaders_seen', 0) + 1
-                    # Skip LEADER entity entirely (its text follows as MTEXT)
-                else:
-                    # Unknown entity type, count it anyway to track coverage
-                    self._unknown_types = getattr(self, '_unknown_types', "")
-                    self._unknown_types += f"  {entity.entity_type}={entity.__class__.__name__}\n"
+                elif et == "DIMENSION" and self._native_dims:
+                    added = self._add_dimension(entity, w_nm)
+                elif et == "LEADER" and self._native_dims:
+                    added = self._add_leader(entity, w_nm)
 
                 if added:
                     count += 1
@@ -667,7 +627,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                     math.hypot(e.x_text - mx, e.y_text - my)
                 )
                 # Direction for ORTHOGONAL: need per-axis logic
-                if dim.__class__.__name__ == "PCB_DIM_ORTHOGONAL":
+                if isinstance(dim, pcbnew.PCB_DIM_ORTHOGONAL):
                     if dx > dy:
                         h = self._to_board_coord(e.y_text - my)
                     else:
@@ -690,14 +650,10 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             if e.text:
                 dim.SetOverrideText(e.text)
                 dim.SetOverrideTextEnabled(True)
-            self._apply_font_props(dim, getattr(e, 'font_props', {}))
+            self._apply_font_props(dim, e.font_props)
             self.board.Add(dim)
-            self._dimensions_added = getattr(self, '_dimensions_added', 0) + 1
             return True
-        except Exception as ex:
-            import traceback
-            msg = f"Dimension add failed:\n{traceback.format_exc()}"
-            self._dim_errors = getattr(self, '_dim_errors', "") + msg + "\n---\n"
+        except Exception:
             return False
 
     def _add_leader(self, e, width_nm: int) -> bool:
@@ -706,10 +662,8 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             dim = pcbnew.PCB_DIM_LEADER(self.board)
             dim.SetLayer(self._dim_layer_id)
 
-            hooks = getattr(e, 'hooks', [])
+            hooks = e.hooks
             if len(hooks) >= 2:
-                # hooks[0] = text anchor, hooks[-1] = arrow tip
-                # KiCad LEADER: SetStart=text, SetEnd=arrow, SetTextPos=text
                 tx = self._to_board_coord(hooks[0][0])
                 ty = self._to_board_coord(hooks[0][1])
                 ax = self._to_board_coord(hooks[-1][0])
@@ -717,25 +671,16 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                 dim.SetStart(pcbnew.VECTOR2I(tx, ty))
                 dim.SetEnd(pcbnew.VECTOR2I(ax, ay))
                 dim.SetTextPos(pcbnew.VECTOR2I(tx, ty))
-                # Store text pos for debug
-                self._leader_tx = f"textPos={dim.GetTextPos()}"
             else:
-                self._leader_hooks_debug = getattr(self, '_leader_hooks_debug', "") + \
-                    f"NO HOOKS: hooks={hooks} tip=({e.x_tip},{e.y_tip})\n"
                 dim.SetEnd(pcbnew.VECTOR2I(
                     self._to_board_coord(e.x_tip),
                     self._to_board_coord(e.y_tip),
                 ))
-            # Enable text override so we can set text later
             dim.SetOverrideText("\n")
 
             self.board.Add(dim)
-            self._leaders_added = getattr(self, '_leaders_added', 0) + 1
             return True
-        except Exception as ex:
-            import traceback
-            msg = f"Leader add failed:\n{traceback.format_exc()}"
-            self._dim_errors = getattr(self, '_dim_errors', "") + msg + "\n---\n"
+        except Exception:
             return False
 
     # ── Font helper ──────────────────────────────────────────
