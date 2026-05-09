@@ -149,9 +149,9 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             self._show_info("The DXF file contains no supported entities.")
             return
 
-        # Step 5: Refresh the board view twice to force redraw
+        # Step 5: Force board update and refresh
         pcbnew.Refresh()
-        pcbnew.Refresh()
+        pcbnew.UpdateUserInterface()
 
         dim_info = ""
         if hasattr(self, '_dimensions_added'):
