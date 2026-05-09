@@ -124,8 +124,16 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
 
         # Step 4: Import entities into the board
         count = self._import_entities(entities)
+
+        # Debug: check entity types
+        type_counts = {}
+        for e in entities:
+            t = e.entity_type
+            type_counts[t] = type_counts.get(t, 0) + 1
+        print(f"DXF Import: entity types: {type_counts}")
+
         if count == 0:
-            self._show_info("No entities were imported.")
+            self._show_info("The DXF file contains no supported entities.")
             return
 
         # Step 5: Refresh the board view
@@ -134,7 +142,8 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         self._show_info(
             f"Successfully imported {count} entities from DXF.\n"
             f"File: {os.path.basename(self.dxf_file)}\n"
-            f"Layer: {self._layer_name_from_id(self.target_layer_id)}"
+            f"Layer: {self._layer_name_from_id(self.target_layer_id)}\n"
+            f"Types: {type_counts}"
         )
 
     # ── Dialogs ──────────────────────────────────────────────
