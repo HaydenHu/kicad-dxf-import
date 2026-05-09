@@ -686,15 +686,12 @@ class DxfReader:
             # \x0cS or \x03S = \\f font tag starting with S, not \\S stack
             if leader != "\x5c" and letter == "S":
                 return ""
-            # \\S stack: upper^lower -> upper\nlower (two lines)
-            # \\S upper/lower -> upper\nlower with overline on upper
+            # \\S stack: upper^lower or upper/lower
+            # Convert to two lines, lower line with overline
             if leader == "\x5c" and letter == "S":
-                if "^" in inner:
-                    return inner.replace("^", "\n")
-                if "/" in inner:
-                    upper, lower = inner.split("/", 1)
-                    return upper + "\n" + lower
-                return inner
+                sep = "^" if "^" in inner else "/"
+                upper, lower = inner.split(sep, 1)
+                return upper + "\n~{" + lower + "}"
             return ""
 
         text = re.sub(r"[\x03\x0c\x5c][A-Za-z][^;]*;", _replace_code, text)
