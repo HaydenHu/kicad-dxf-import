@@ -631,6 +631,8 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                 self._to_board_coord(e.y_text),
             ))
             dim.SetLayer(self.target_layer_id)
+            dim.SetUnitsMode(pcbnew.DIM_UNITS_MODE_MM)
+            dim.SetUnitsFormat(pcbnew.DIM_UNITS_FORMAT_NO_SUFFIX)
             if e.text:
                 dim.SetOverrideText(e.text)
                 dim.SetOverrideTextEnabled(True)
