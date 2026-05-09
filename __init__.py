@@ -145,8 +145,6 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         for e in entities:
             t = e.entity_type
             type_counts[t] = type_counts.get(t, 0) + 1
-        print(f"DXF Import: entity types: {type_counts}")
-
         if count == 0:
             self._show_info("The DXF file contains no supported entities.")
             return
