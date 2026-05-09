@@ -608,23 +608,20 @@ class DxfReader:
 
     @staticmethod
     def _clean_mtext(text: str) -> str:
-        """Remove DXF MTEXT formatting codes while preserving CJK text.
-
-        Handles: \\f (font), \\C (color), \\A (alignment), \\H (height),
-        \\Q (oblique), \\W (width), \\T (tracking), \\p (paragraph),
-        \\L (underline), \\O (overline), \\S (stack: upper^lower -> upper)
-        """
+        """Remove DXF MTEXT formatting codes while preserving CJK text."""
         import re
-        # \S upper^lower;  -> keep upper part only
-        text = re.sub(r"\\S([^;]*)\^[^;]*;", r"\1", text)
-        # Remove other format codes: \<letter><params>;
-        text = re.sub(r"\\[AHQWFTCLOp][^;]*;", "", text)
-        # Paragraph break
-        text = text.replace("\\P", "\n")
-        # Curly braces for grouping
+        # Handle \P paragraph break BEFORE removing format codes
+        text = text.replace("\x5cP", "\n").replace("\x0cP", "\n")
+
+        # Handle \S stack: upper^lower; or upper/lower; -> keep upper
+        text = re.sub(r"[\x0c\x5c]S([^/^;]*)[/^][^;]*;", r"\1", text)
+
+        # Remove all other format codes: \<letter><anything except ;>;
+        text = re.sub(r"[\x03\x0c\x5c][A-Za-z][^;]*;", "", text)
+
+        # Remove formatting braces and specials
         text = text.replace("{", "").replace("}", "")
-        # Non-breaking space
-        text = text.replace("\\~", " ")
+        text = text.replace("\x5c~", " ")
         return text.strip()
 
     def _parse_ellipse(self, idx: int) -> int:
