@@ -646,7 +646,8 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             else:
                 dx = abs(e.x_end - e.x_start)
                 dy = abs(e.y_end - e.y_start)
-                if dx < 0.01 or dy < 0.01:
+                # If one axis is dominant (>10x the other), treat as H/V
+                if dx < 0.01 or dy < 0.01 or (dx > 0 and dy / dx > 10) or (dy > 0 and dx / dy > 10):
                     # Horizontal or vertical: use ALIGNED
                     dim = pcbnew.PCB_DIM_ALIGNED(self.board)
                 else:
