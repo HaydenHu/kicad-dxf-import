@@ -158,6 +158,8 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             dim_info += f"\nDimensions: {self._dimensions_added}"
         if hasattr(self, '_leaders_added'):
             dim_info += f"\nLeaders: {self._leaders_added}"
+        if hasattr(self, '_unknown_types') and self._unknown_types:
+            dim_info += f"\nUnhandled types:\n{self._unknown_types}"
         if hasattr(self, '_leader_hooks_debug') and self._leader_hooks_debug:
             dim_info += f"\nLeader debug:\n{self._leader_hooks_debug[:300]}"
         if hasattr(self, '_dim_errors') and self._dim_errors:
@@ -371,6 +373,10 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                     if self._native_dims:
                         added = self._add_leader(entity, w_nm)
                     # Skip LEADER entity entirely (its text follows as MTEXT)
+                else:
+                    # Unknown entity type, count it anyway to track coverage
+                    self._unknown_types = getattr(self, '_unknown_types', "")
+                    self._unknown_types += f"  {entity.entity_type}={entity.__class__.__name__}\n"
 
                 if added:
                     count += 1
