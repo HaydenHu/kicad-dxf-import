@@ -644,6 +644,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
 
             if hasattr(e, 'dim_type') and e.dim_type == "DIAMETRIC":
                 dim = pcbnew.PCB_DIM_RADIAL(self.board)
+                dim.SetPrefix("")  # Remove default "R " prefix
             else:
                 dim = pcbnew.PCB_DIM_ALIGNED(self.board)
                 mx = (e.x_start + e.x_end) / 2.0
