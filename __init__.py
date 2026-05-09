@@ -137,8 +137,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             self._show_info("The DXF file contains no supported entities.")
             return
 
-        # Step 5: Force board update and refresh
-        self.board.IncrementTimestamp()
+        # Step 5: Refresh the board view
         pcbnew.Refresh()
 
         dim_info = ""
