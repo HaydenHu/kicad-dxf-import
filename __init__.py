@@ -429,21 +429,21 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         return True
 
     def _add_polyline_points(self, pts, closed, width_nm):
-        for i in range(len(pts) - 1):
+        # Cache the converted end point as the next segment's start
+        prev = pcbnew.VECTOR2I(
+            self._to_board_coord(pts[0][0]), self._to_board_coord(pts[0][1]))
+        for i in range(1, len(pts)):
+            cur = pcbnew.VECTOR2I(
+                self._to_board_coord(pts[i][0]), self._to_board_coord(pts[i][1]))
             shape = self._make_shape(pcbnew.SHAPE_T_SEGMENT, self.target_layer_id, width_nm)
-            shape.SetStart(pcbnew.VECTOR2I(
-                self._to_board_coord(pts[i][0]), self._to_board_coord(pts[i][1]),
-            ))
-            shape.SetEnd(pcbnew.VECTOR2I(
-                self._to_board_coord(pts[i + 1][0]), self._to_board_coord(pts[i + 1][1]),
-            ))
+            shape.SetStart(prev)
+            shape.SetEnd(cur)
             self.board.Add(shape)
+            prev = cur
 
         if closed and len(pts) > 2:
             shape = self._make_shape(pcbnew.SHAPE_T_SEGMENT, self.target_layer_id, width_nm)
-            shape.SetStart(pcbnew.VECTOR2I(
-                self._to_board_coord(pts[-1][0]), self._to_board_coord(pts[-1][1]),
-            ))
+            shape.SetStart(prev)
             shape.SetEnd(pcbnew.VECTOR2I(
                 self._to_board_coord(pts[0][0]), self._to_board_coord(pts[0][1]),
             ))
