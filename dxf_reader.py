@@ -101,7 +101,7 @@ class DxfText(DxfEntity):
     style: str = "STANDARD"
     halign: int = 0  # 0=left, 1=center, 2=right
     valign: int = 0  # 0=baseline, 1=bottom, 2=middle, 3=top
-    font_name: str = ""
+    font_props: dict = field(default_factory=dict)
 
     def __post_init__(self):
         self.entity_type = "TEXT"
@@ -116,7 +116,7 @@ class DxfMText(DxfEntity):
     rotation: float = 0.0
     rect_width: float = 0.0
     attachment_point: int = 1
-    font_name: str = ""
+    font_props: dict = field(default_factory=dict)
 
     def __post_init__(self):
         self.entity_type = "MTEXT"
@@ -563,10 +563,10 @@ class DxfReader:
             elif code == 40:
                 text.height = float(value)
             elif code == 1:
-                # Clean TEXT content, extract font
-                cleaned, font_name = self._clean_mtext_ex(value)
+                # Clean TEXT content, extract font properties
+                cleaned, font_props = self._clean_mtext_ex(value)
                 text.text = cleaned
-                text.font_name = font_name
+                text.font_props = font_props
             elif code == 50:
                 text.rotation = float(value)
             elif code == 7:
@@ -604,27 +604,51 @@ class DxfReader:
             elif code == 3:
                 raw_text_parts.append(value)
             idx += 1
-        # Strip DXF formatting codes like \A1;\P\H etc., extract font
+        # Strip DXF formatting codes, extract font properties
         text = "".join(raw_text_parts)
-        cleaned_text, font_name = self._clean_mtext_ex(text)
+        cleaned_text, font_props = self._clean_mtext_ex(text)
         mtext.text = cleaned_text
-        mtext.font_name = font_name
+        mtext.font_props = font_props
         self.entities.append(mtext)
         return idx
 
     @staticmethod
-    def _extract_font_name(text: str) -> tuple[str, str]:
-        """Extract font name from \\f tag. Returns (font_name_or_empty, cleaned_text).
-        e.g. \\fSimSun|b0|i0|c134|p2;Hello -> ('SimSun', 'Hello')
+    def _parse_font_tag(text: str) -> tuple[dict, str]:
+        """Extract font properties from \\f tag.
+        Returns (props_dict, remaining_text).
+        e.g. \\fSimSun|b0|i0|c134|p2;Hello
+          -> ({'name': 'SimSun', 'bold': False, 'italic': False, 'color': 134}, 'Hello')
         """
         import re
-        font_name = ""
-        # Match literal \\f font tag (\\x5cf or \\x0cf, i.e. backslash+f or formfeed+f)
-        m = re.match(r"[\x03\x0c\x5c][fF]([^|;]*)[|;]", text)
+        props = {}
+        # Match \\f font tag: \\f<name>|param1|param2|...;
+        m = re.match(r"[\x03\x0c\x5c][fF]([^;]*)[" + re.escape("|;") + "]", text)
         if m:
-            font_name = m.group(1)
+            raw = m.group(1)  # e.g. "SimSun|b0|i0|c134|p2"
+            parts = raw.split("|")
+            if parts:
+                props["name"] = parts[0]
+            for p in parts[1:]:
+                if not p:
+                    continue
+                code = p[0].lower()
+                val = p[1:] if len(p) > 1 else ""
+                if code == "b":
+                    props["bold"] = (val != "0")
+                elif code == "i":
+                    props["italic"] = (val != "0")
+                elif code == "c":
+                    try:
+                        props["color"] = int(val)
+                    except ValueError:
+                        pass
+                elif code == "p":
+                    try:
+                        props["pitch"] = int(val)
+                    except ValueError:
+                        pass
             text = text[m.end():]
-        return font_name, text
+        return props, text
 
     @staticmethod
     def _clean_mtext(text: str) -> str:
@@ -632,12 +656,12 @@ class DxfReader:
         return DxfReader._clean_mtext_ex(text)[0]
 
     @staticmethod
-    def _clean_mtext_ex(text: str) -> tuple[str, str]:
-        """Remove DXF MTEXT formatting codes, return (cleaned_text, font_name)."""
+    def _clean_mtext_ex(text: str) -> tuple[str, dict]:
+        """Remove DXF MTEXT formatting codes, return (cleaned_text, font_props)."""
         import re
 
-        # Extract font name from \\f tag
-        font_name, text = DxfReader._extract_font_name(text)
+        # Extract font properties from \\f tag
+        font_props, text = DxfReader._parse_font_tag(text)
 
         # Handle \\P paragraph break before format code removal
         text = text.replace("\x5cP", "\n").replace("\x0cP", "\n")
@@ -679,7 +703,7 @@ class DxfReader:
 
         text = text.replace("{", "").replace("}", "")
         text = text.replace("\x5c~", " ")
-        return text.strip(), font_name
+        return text.strip(), font_props
 
     def _parse_ellipse(self, idx: int) -> int:
         idx, attrs = self._read_attrs(idx)

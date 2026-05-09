@@ -411,7 +411,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             pcbnew.GR_TEXT_V_ALIGN_TOP if e.valign == 3 else
             pcbnew.GR_TEXT_V_ALIGN_BOTTOM
         )
-        self._apply_font(txt, e.font_name)
+        self._apply_font_props(txt, e.font_props)
         self.board.Add(txt)
         return True
 
@@ -438,7 +438,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             pcbnew.GR_TEXT_V_ALIGN_BOTTOM if ap in (7, 8, 9) else
             pcbnew.GR_TEXT_V_ALIGN_CENTER
         )
-        self._apply_font(txt, e.font_name)
+        self._apply_font_props(txt, e.font_props)
         self.board.Add(txt)
         return True
 
@@ -537,14 +537,57 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
 
     # ── Font helper ──────────────────────────────────────────
 
+    # AutoCAD Color Index (ACI) to RGB approximation
+    # 0=BYBLOCK, 256=BYLAYER, 7=white/black, rest are standard colors
+    _ACI_COLORS = {
+        1:  (255, 0, 0),     2:  (255, 255, 0),   3:  (0, 255, 0),
+        4:  (0, 255, 255),   5:  (0, 0, 255),     6:  (255, 0, 255),
+        7:  (255, 255, 255), 8:  (128, 128, 128), 9:  (192, 192, 192),
+        10: (255, 0, 0),    11: (255, 128, 128),  12: (166, 0, 0),
+        13: (166, 83, 0),   14: (166, 116, 0),    15: (166, 150, 0),
+        16: (150, 166, 0),  17: (116, 166, 0),    18: (83, 166, 0),
+        20: (0, 166, 83),   21: (0, 166, 116),    22: (0, 166, 150),
+        23: (0, 150, 166),  24: (0, 116, 166),    25: (0, 83, 166),
+        30: (255, 128, 64), 31: (255, 179, 179),  40: (255, 212, 170),
+        50: (255, 238, 170), 60: (255, 255, 170),  70: (230, 255, 170),
+        80: (170, 255, 170), 90: (170, 255, 209), 100: (170, 255, 230),
+        110: (170, 255, 255), 120: (170, 230, 255), 130: (170, 209, 255),
+        140: (170, 170, 255), 150: (209, 170, 255), 160: (230, 170, 255),
+        170: (255, 170, 255), 180: (255, 170, 230), 190: (255, 170, 209),
+        200: (255, 170, 170), 210: (255, 128, 170), 220: (255, 85, 170),
+        230: (255, 43, 170), 240: (255, 0, 170),   250: (128, 128, 128),
+    }
+
     @staticmethod
-    def _apply_font(txt: pcbnew.PCB_TEXT, font_name: str) -> None:
-        """Try to set the TrueType font on a PCB_TEXT. Silently ignore if unavailable."""
-        if font_name:
+    def _apply_font_props(txt: pcbnew.PCB_TEXT, props: dict) -> None:
+        """Apply extracted font properties to PCB_TEXT."""
+        if not props:
+            return
+        if props.get("name"):
             try:
-                txt.SetUnresolvedFontName(font_name)
+                txt.SetUnresolvedFontName(props["name"])
             except Exception:
-                pass  # Font not available on this system
+                pass
+        if "bold" in props:
+            try:
+                txt.SetBold(props["bold"])
+            except Exception:
+                pass
+        if "italic" in props:
+            try:
+                txt.SetItalic(props["italic"])
+            except Exception:
+                pass
+        if "color" in props:
+            try:
+                ci = props["color"]
+                if ci > 0 and ci != 256 and ci != 7:
+                    rgb = DxfImportPlugin._ACI_COLORS.get(ci, (255, 255, 255))
+                    c = pcbnew.COLOR4D()
+                    c.FromCSSRGBA(rgb[0], rgb[1], rgb[2], 1.0)
+                    txt.SetTextColor(c)
+            except Exception:
+                pass
 
     # ── Layer helpers ─────────────────────────────────────────
 
