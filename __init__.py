@@ -26,8 +26,10 @@ import wx
 from .dxf_reader import (
     DxfArc,
     DxfCircle,
+    DxfDimension,
     DxfEllipse,
     DxfEntity,
+    DxfLeader,
     DxfLine,
     DxfLwPolyline,
     DxfMText,
@@ -290,6 +292,10 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                     added = self._add_ellipse(entity, w_nm)
                 elif isinstance(entity, DxfSpline):
                     added = self._add_spline(entity, w_nm)
+                elif isinstance(entity, DxfDimension):
+                    added = self._add_dimension(entity, w_nm)
+                elif isinstance(entity, DxfLeader):
+                    added = self._add_leader(entity, w_nm)
 
                 if added:
                     count += 1
@@ -537,6 +543,57 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             ))
             self.board.Add(shape)
 
+        return True
+
+    # ── Dimension / Leader ───────────────────────────────────
+
+    def _add_dimension(self, e: DxfDimension, width_nm: int) -> bool:
+        """Add DXF DIMENSION as KiCad native dimension element."""
+        if e.dim_type == "DIAMETRIC":
+            # Diametric: use PCB_DIM_LEADER or PCB_DIM_RADIAL
+            dim = pcbnew.PCB_DIM_RADIAL(self.board)
+            # For radial, set center and circle point
+            # (cx,cy) = endpoint, crossing point determines radius line
+            dim.SetStart(pcbnew.VECTOR2I(
+                self._to_board_coord(e.x_start),
+                self._to_board_coord(e.y_start),
+            ))
+            dim.SetEnd(pcbnew.VECTOR2I(
+                self._to_board_coord(e.x_end),
+                self._to_board_coord(e.y_end),
+            ))
+        else:
+            # Aligned dimension
+            dim = pcbnew.PCB_DIM_ALIGNED(self.board)
+            dim.SetStart(pcbnew.VECTOR2I(
+                self._to_board_coord(e.x_start),
+                self._to_board_coord(e.y_start),
+            ))
+            dim.SetEnd(pcbnew.VECTOR2I(
+                self._to_board_coord(e.x_end),
+                self._to_board_coord(e.y_end),
+            ))
+            # Crossbar line (dimension line) position
+            dim.SetHeight(0)
+            dim.SetExtensionOffset(0)
+
+        dim.SetLayer(self.target_layer_id)
+        if e.text:
+            dim.SetOverrideText(e.text)
+            dim.SetOverrideTextEnabled(True)
+        self._apply_font_props(dim, e.font_props)
+        self.board.Add(dim)
+        return True
+
+    def _add_leader(self, e: DxfLeader, width_nm: int) -> bool:
+        """Add DXF LEADER as KiCad PCB_DIM_LEADER element."""
+        dim = pcbnew.PCB_DIM_LEADER(self.board)
+        dim.SetLayer(self.target_layer_id)
+        dim.SetEnd(pcbnew.VECTOR2I(
+            self._to_board_coord(e.x_tip),
+            self._to_board_coord(e.y_tip),
+        ))
+        self.board.Add(dim)
         return True
 
     # ── Font helper ──────────────────────────────────────────

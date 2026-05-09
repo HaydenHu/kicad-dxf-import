@@ -153,6 +153,39 @@ class DxfSpline(DxfEntity):
         self.entity_type = "SPLINE"
 
 
+@dataclass
+class DxfDimension(DxfEntity):
+    """DXF DIMENSION entity (aligned, rotated, or diametric)."""
+    x_text: float = 0.0
+    y_text: float = 0.0
+    x_mid: float = 0.0
+    y_mid: float = 0.0
+    x_start: float = 0.0
+    y_start: float = 0.0
+    x_end: float = 0.0
+    y_end: float = 0.0
+    flags: int = 0
+    rotation: float = 0.0
+    measured: float = 0.0
+    text: str = ""
+    dim_type: str = ""  # "ALIGNED" or "DIAMETRIC"
+    font_props: dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        self.entity_type = "DIMENSION"
+
+
+@dataclass
+class DxfLeader(DxfEntity):
+    """DXF LEADER entity (arrow with text annotation)."""
+    x_tip: float = 0.0
+    y_tip: float = 0.0
+    hooks: list[tuple[float, float]] = field(default_factory=list)
+
+    def __post_init__(self):
+        self.entity_type = "LEADER"
+
+
 class DxfReader:
     """Parses a DXF file and returns a list of entity objects."""
 
@@ -378,6 +411,8 @@ class DxfReader:
             "MTEXT": self._parse_mtext,
             "ELLIPSE": self._parse_ellipse,
             "SPLINE": self._parse_spline,
+            "DIMENSION": self._parse_dimension,
+            "LEADER": self._parse_leader,
         }
         handler = handlers.get(etype)
         if handler:
@@ -788,6 +823,83 @@ class DxfReader:
             if self._tokens[idx][0] == 0:
                 break
             idx += 1
+        return idx
+
+    def _parse_dimension(self, idx: int) -> int:
+        idx, attrs = self._read_attrs(idx)
+        dim = DxfDimension(**attrs)
+        # Skip AcDbDimension subclass marker
+        raw_text_parts: list[str] = []
+        while idx < len(self._tokens):
+            code, value = self._tokens[idx]
+            if code == 0:
+                break
+            if code == 10:
+                dim.x_text = float(value)
+            elif code == 20:
+                dim.y_text = float(value)
+            elif code == 11:
+                dim.x_mid = float(value)
+            elif code == 21:
+                dim.y_mid = float(value)
+            elif code == 13:
+                dim.x_start = float(value)
+            elif code == 23:
+                dim.y_start = float(value)
+            elif code == 14:
+                dim.x_end = float(value)
+            elif code == 24:
+                dim.y_end = float(value)
+            elif code == 15:  # diametric: leader endpoint
+                dim.x_end = float(value) if dim.x_end == 0 else dim.x_end
+            elif code == 25:
+                dim.y_end = float(value) if dim.y_end == 0 else dim.y_end
+            elif code == 42:
+                dim.measured = float(value)
+            elif code == 50:
+                dim.rotation = float(value)
+            elif code == 70:
+                dim.flags = int(value)
+            elif code == 1:
+                raw_text_parts.append(value)
+            # subclass markers
+            elif code == 100 and "Diametric" in value:
+                dim.dim_type = "DIAMETRIC"
+            elif code == 100 and ("Aligned" in value or "Rotated" in value):
+                dim.dim_type = "ALIGNED"
+            idx += 1
+
+        text = "".join(raw_text_parts)
+        if text:
+            cleaned, font_props = self._clean_mtext_ex(text)
+            dim.text = cleaned
+            dim.font_props = font_props
+        elif dim.measured:
+            dim.text = str(round(dim.measured, 2))
+
+        self.entities.append(dim)
+        return idx
+
+    def _parse_leader(self, idx: int) -> int:
+        idx, attrs = self._read_attrs(idx)
+        leader = DxfLeader(**attrs)
+        hooks: list[tuple[float, float]] = []
+        while idx < len(self._tokens):
+            code, value = self._tokens[idx]
+            if code == 0:
+                break
+            if code == 10:
+                leader.x_tip = float(value)
+            elif code == 20:
+                leader.y_tip = float(value)
+            elif code == 211:
+                hooks.append((float(value), 0.0))
+            elif code == 221:
+                if hooks:
+                    hooks[-1] = (hooks[-1][0], float(value))
+            idx += 1
+        leader.hooks = hooks
+        self.entities.append(leader)
         return idx
 
 
