@@ -140,11 +140,19 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         # Step 5: Refresh the board view
         pcbnew.Refresh()
 
+        dim_info = ""
+        if hasattr(self, '_dimensions_added'):
+            dim_info += f"\nDimensions: {self._dimensions_added}"
+        if hasattr(self, '_leaders_added'):
+            dim_info += f"\nLeaders: {self._leaders_added}"
+        if hasattr(self, '_dim_errors') and self._dim_errors:
+            dim_info += f"\nErrors:\n{self._dim_errors[:500]}"
+
         self._show_info(
             f"Successfully imported {count} entities from DXF.\n"
             f"File: {os.path.basename(self.dxf_file)}\n"
             f"Layer: {self._layer_name_from_id(self.target_layer_id)}\n"
-            f"Types: {type_counts}"
+            f"Types: {type_counts}{dim_info}"
         )
 
     # ── Dialogs ──────────────────────────────────────────────
@@ -590,11 +598,30 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                 dim.SetOverrideTextEnabled(True)
             self._apply_font_props(dim, getattr(e, 'font_props', {}))
             self.board.Add(dim)
+            self._dimensions_added = getattr(self, '_dimensions_added', 0) + 1
             return True
         except Exception as ex:
-            print(f"DXF: _add_dimension failed: {ex}", file=sys.stderr)
             import traceback
-            traceback.print_exc(file=sys.stderr)
+            msg = f"Dimension add failed:\n{traceback.format_exc()}"
+            self._dim_errors = getattr(self, '_dim_errors', "") + msg + "\n---\n"
+            return False
+
+    def _add_leader(self, e, width_nm: int) -> bool:
+        """Add DXF LEADER as KiCad PCB_DIM_LEADER element."""
+        try:
+            dim = pcbnew.PCB_DIM_LEADER(self.board)
+            dim.SetLayer(self.target_layer_id)
+            dim.SetEnd(pcbnew.VECTOR2I(
+                self._to_board_coord(e.x_tip),
+                self._to_board_coord(e.y_tip),
+            ))
+            self.board.Add(dim)
+            self._leaders_added = getattr(self, '_leaders_added', 0) + 1
+            return True
+        except Exception as ex:
+            import traceback
+            msg = f"Leader add failed:\n{traceback.format_exc()}"
+            self._dim_errors = getattr(self, '_dim_errors', "") + msg + "\n---\n"
             return False
 
     def _add_leader(self, e: DxfLeader, width_nm: int) -> bool:
