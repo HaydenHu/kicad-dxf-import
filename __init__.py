@@ -158,6 +158,8 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             dim_info += f"\nDimensions: {self._dimensions_added}"
         if hasattr(self, '_leaders_added'):
             dim_info += f"\nLeaders: {self._leaders_added}"
+        if hasattr(self, '_leader_hooks_debug') and self._leader_hooks_debug:
+            dim_info += f"\nLeader debug:\n{self._leader_hooks_debug[:300]}"
         if hasattr(self, '_dim_errors') and self._dim_errors:
             dim_info += f"\nErrors:\n{self._dim_errors[:500]}"
 
@@ -675,7 +677,6 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
 
             hooks = getattr(e, 'hooks', [])
             if len(hooks) >= 2:
-                # hooks[0] = text anchor, hooks[-1] = arrow tip
                 dim.SetStart(pcbnew.VECTOR2I(
                     self._to_board_coord(hooks[0][0]),
                     self._to_board_coord(hooks[0][1]),
@@ -684,7 +685,11 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                     self._to_board_coord(hooks[-1][0]),
                     self._to_board_coord(hooks[-1][1]),
                 ))
+                self._leader_hooks_debug = getattr(self, '_leader_hooks_debug', "") + \
+                    f"hooks={hooks} start={dim.GetStart()} end={dim.GetEnd()}\n"
             else:
+                self._leader_hooks_debug = getattr(self, '_leader_hooks_debug', "") + \
+                    f"NO HOOKS: hooks={hooks} tip=({e.x_tip},{e.y_tip})\n"
                 dim.SetEnd(pcbnew.VECTOR2I(
                     self._to_board_coord(e.x_tip),
                     self._to_board_coord(e.y_tip),
