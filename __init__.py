@@ -95,8 +95,8 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         self.dxf_file: str = ""
         self._line_width: float = 0.1
         self._text_layer_id: int = pcbnew.Eco1_User
-        self._native_dims: bool = True  # Use KiCad native dimensions by default
-        self._dim_layer_id: int = pcbnew.Dwgs_User  # Layer for native dimensions
+        self._native_dims: bool = False  # Native dimensions off by default
+        self._dim_layer_id: int = pcbnew.Cmts_User  # Layer for native dimensions
         self._leaders_seen: int = 0
 
     def Run(self) -> None:
@@ -276,7 +276,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
 
         # Native dimensions checkbox
         native_cb = wx.CheckBox(panel, label="Use KiCad native dimensions (DIMENSION/LEADER)")
-        native_cb.SetValue(True)
+        native_cb.SetValue(False)
         native_cb.SetToolTip(
             "When checked, DXF DIMENSION and LEADER entities are converted "
             "to KiCad native dimension objects. When unchecked, they remain "
@@ -289,9 +289,9 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         dim_layer_sizer.Add(wx.StaticText(panel, label="Dimension layer:"), 0,
                             wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 10)
         dim_layer_choice = wx.Choice(panel, choices=LAYER_CHOICES)
-        # Default: Dwgs.User (User.Drawings)
-        dwgs_idx = LAYER_CHOICES.index("Dwgs.User") if "Dwgs.User" in LAYER_CHOICES else 0
-        dim_layer_choice.SetSelection(dwgs_idx)
+        # Default: Cmts.User (User.Comments)
+        cmts_idx = LAYER_CHOICES.index("Cmts.User") if "Cmts.User" in LAYER_CHOICES else 0
+        dim_layer_choice.SetSelection(cmts_idx)
         dim_layer_sizer.Add(dim_layer_choice, 0, wx.LEFT, 10)
         sizer.Add(dim_layer_sizer, 0, wx.BOTTOM, 10)
 
