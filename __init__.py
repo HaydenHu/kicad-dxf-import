@@ -124,8 +124,19 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         if not self._show_settings_dialog(entities):
             return  # user cancelled
 
-        # Step 4: Import entities into the board
-        count = self._import_entities(entities)
+        # Step 4: Collect dim/leader text to skip duplicate MTEXT imports
+        dim_texts: set[str] = set()
+        if self._native_dims:
+            for e in entities:
+                if e.entity_type in ("DIMENSION", "LEADER"):
+                    t = getattr(e, 'text', '').strip()
+                    if t:
+                        dim_texts.add(t)
+                        # Also add individual lines from multi-line text
+                        for line in t.split('\n'):
+                            dim_texts.add(line.strip())
+
+        count = self._import_entities(entities, dim_texts)
 
         # Debug: check entity types
         type_counts = {}
@@ -298,12 +309,18 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
 
     # ── Entity to board conversion ───────────────────────────
 
-    def _import_entities(self, entities: list[DxfEntity]) -> int:
+    def _import_entities(self, entities: list[DxfEntity], dim_texts: set = None) -> int:
         count = 0
         w_nm = int(self._line_width * 1_000_000)
 
         for entity in entities:
             try:
+                # Skip MTEXT whose text matches dimension/leader text when using native dims
+                if dim_texts and entity.entity_type in ("MTEXT", "TEXT"):
+                    txt = getattr(entity, 'text', '').strip()
+                    if txt and (txt in dim_texts or any(line.strip() in dim_texts for line in txt.split('\n'))):
+                        continue
+
                 added = False
                 if isinstance(entity, DxfLine):
                     added = self._add_line(entity, w_nm)
@@ -326,10 +343,11 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                 elif entity.entity_type == "DIMENSION":
                     if self._native_dims:
                         added = self._add_dimension(entity, w_nm)
-                    # If native dims disabled, skip (keep LINE+TEXT representation)
+                    # Skip DIMENSION entity entirely (text is inline, lines are separate)
                 elif entity.entity_type == "LEADER":
                     if self._native_dims:
                         added = self._add_leader(entity, w_nm)
+                    # Skip LEADER entity entirely (its text follows as MTEXT)
 
                 if added:
                     count += 1
