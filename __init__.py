@@ -137,8 +137,14 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             self._show_info("The DXF file contains no supported entities.")
             return
 
-        # Step 5: Refresh the board view
+        # Step 5: Force board update and refresh
+        try:
+            self.board.BuildListOfNets()
+        except Exception:
+            pass
         pcbnew.Refresh()
+        self.board.UpdateAllDims()
+        pcbnew.UpdateUserInterface()
 
         dim_info = ""
         if hasattr(self, '_dimensions_added'):
@@ -618,8 +624,8 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
 
             hooks = getattr(e, 'hooks', [])
             if len(hooks) >= 2:
-                # hooks[0] = text/start point, hooks[-1] = arrow tip
-                dim.SetTextPos(pcbnew.VECTOR2I(
+                # hooks[0] = text anchor, hooks[-1] = arrow tip
+                dim.SetStart(pcbnew.VECTOR2I(
                     self._to_board_coord(hooks[0][0]),
                     self._to_board_coord(hooks[0][1]),
                 ))
@@ -628,11 +634,12 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                     self._to_board_coord(hooks[-1][1]),
                 ))
             else:
-                # Fallback: use x_tip/y_tip as arrow tip
                 dim.SetEnd(pcbnew.VECTOR2I(
                     self._to_board_coord(e.x_tip),
                     self._to_board_coord(e.y_tip),
                 ))
+            # Enable text override so we can set text later
+            dim.SetOverrideTextEnabled(True)
 
             self.board.Add(dim)
             self._leaders_added = getattr(self, '_leaders_added', 0) + 1
