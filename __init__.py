@@ -646,18 +646,16 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                 dim = pcbnew.PCB_DIM_RADIAL(self.board)
                 dim.SetPrefix("")  # Remove default "R " prefix
             else:
-                # Use ORTHOGONAL for all linear dimensions
                 dim = pcbnew.PCB_DIM_ORTHOGONAL(self.board)
+                # Height: distance from measurement line midpoint to text position
                 mx = (e.x_start + e.x_end) / 2.0
                 my = (e.y_start + e.y_end) / 2.0
-                h = int(math.hypot(
-                    self._to_board_coord(e.x_text - mx),
-                    self._to_board_coord(e.y_text - my),
-                ))
-                dx = e.x_end - e.x_start
-                dy = e.y_end - e.y_start
-                cross = dx * (e.y_text - my) - dy * (e.x_text - mx)
-                if cross < 0:
+                h = self._to_board_coord(
+                    math.hypot(e.x_text - mx, e.y_text - my)
+                )
+                # Direction: cross product to determine side
+                if (e.x_end - e.x_start) * (e.y_text - my) - \
+                   (e.y_end - e.y_start) * (e.x_text - mx) < 0:
                     h = -h
                 dim.SetHeight(h)
 
