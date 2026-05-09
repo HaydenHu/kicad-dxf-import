@@ -132,9 +132,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             for e in entities:
                 if e.entity_type == "DIMENSION":
                     dim_positions.append((e.x_text, e.y_text))
-                    # Also collect sub-lines for \S multiline
-                    for line in getattr(e, 'text', '').split('\n'):
-                        pass
+                    dim_positions.append((e.x_mid, e.y_mid))
                 elif e.entity_type == "LEADER":
                     hooks = getattr(e, 'hooks', [])
                     if hooks:
