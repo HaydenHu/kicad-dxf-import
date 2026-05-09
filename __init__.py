@@ -644,15 +644,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                 dim = pcbnew.PCB_DIM_RADIAL(self.board)
                 dim.SetPrefix("")  # Remove default "R " prefix
             else:
-                dx = abs(e.x_end - e.x_start)
-                dy = abs(e.y_end - e.y_start)
-                # If one axis is dominant (>10x the other), treat as H/V
-                if dx < 0.01 or dy < 0.01 or (dx > 0 and dy / dx > 10) or (dy > 0 and dx / dy > 10):
-                    # Horizontal or vertical: use ALIGNED
-                    dim = pcbnew.PCB_DIM_ALIGNED(self.board)
-                else:
-                    # Angled: use ORTHOGONAL
-                    dim = pcbnew.PCB_DIM_ORTHOGONAL(self.board)
+                dim = pcbnew.PCB_DIM_ALIGNED(self.board)
                 # Height: distance from measurement line midpoint to text position
                 mx = (e.x_start + e.x_end) / 2.0
                 my = (e.y_start + e.y_end) / 2.0
