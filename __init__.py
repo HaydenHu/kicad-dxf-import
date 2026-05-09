@@ -138,13 +138,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             return
 
         # Step 5: Force board update and refresh
-        try:
-            self.board.BuildListOfNets()
-        except Exception:
-            pass
         pcbnew.Refresh()
-        self.board.UpdateAllDims()
-        pcbnew.UpdateUserInterface()
 
         dim_info = ""
         if hasattr(self, '_dimensions_added'):
