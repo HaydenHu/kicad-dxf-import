@@ -616,23 +616,32 @@ class DxfReader:
     def _parse_font_tag(text: str) -> tuple[dict, str]:
         """Extract font properties from \\f tag.
         Returns (props_dict, remaining_text).
-        e.g. \\fSimSun|b0|i0|c134|p2;Hello
-          -> ({'name': 'SimSun', 'bold': False, 'italic': False, 'color': 134}, 'Hello')
+        \\f may appear as \\x5cf (literal \\f) or \\x0c (formfeed from Python's \\f).
+        Tag format: \\f<fontname>|b<0|1>|i<0|1>|c<color>|p<pitch>;
         """
         import re
         props = {}
-        # Match \\f font tag: \\f<name>|param1|param2|...;
-        m = re.match(r"[\x03\x0c\x5c][fF]([^;]*)[" + re.escape("|;") + "]", text)
+        # Find \\f tag anywhere in text (skip leading format codes like \\A1;)
+        m = re.search(r"[\x03\x0c].*?;", text)
+        if not m:
+            m = re.search(r"\x5cf[^;]*;", text)
         if m:
-            raw = m.group(1)  # e.g. "SimSun|b0|i0|c134|p2"
-            parts = raw.split("|")
+            raw = m.group(0)
+            # Strip leader: \\x0c or \\x03 alone, or \\x5cf
+            inner = raw
+            if inner[0] in "\x03\x0c":
+                inner = inner[1:]
+            elif inner[:2] == "\x5cf":
+                inner = inner[2:]
+            inner = inner.rstrip(";")
+            parts = inner.split("|")
             if parts:
                 props["name"] = parts[0]
             for p in parts[1:]:
-                if not p:
+                if not p or len(p) < 2:
                     continue
                 code = p[0].lower()
-                val = p[1:] if len(p) > 1 else ""
+                val = p[1:]
                 if code == "b":
                     props["bold"] = (val != "0")
                 elif code == "i":
@@ -647,7 +656,8 @@ class DxfReader:
                         props["pitch"] = int(val)
                     except ValueError:
                         pass
-            text = text[m.end():]
+            # Remove only the font tag, keep text before it
+            text = text[:m.start()] + text[m.end():]
         return props, text
 
     @staticmethod
