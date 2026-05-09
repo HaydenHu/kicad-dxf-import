@@ -690,15 +690,14 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             hooks = getattr(e, 'hooks', [])
             if len(hooks) >= 2:
                 # hooks[0] = text anchor, hooks[-1] = arrow tip
-                # KiCad LEADER: arrow at start, text at end
-                dim.SetEnd(pcbnew.VECTOR2I(
-                    self._to_board_coord(hooks[0][0]),
-                    self._to_board_coord(hooks[0][1]),
-                ))
-                dim.SetTextPos(pcbnew.VECTOR2I(
-                    self._to_board_coord(hooks[-1][0]),
-                    self._to_board_coord(hooks[-1][1]),
-                ))
+                # KiCad LEADER: SetStart=text, SetEnd=arrow, SetTextPos=text
+                tx = self._to_board_coord(hooks[0][0])
+                ty = self._to_board_coord(hooks[0][1])
+                ax = self._to_board_coord(hooks[-1][0])
+                ay = self._to_board_coord(hooks[-1][1])
+                dim.SetStart(pcbnew.VECTOR2I(tx, ty))
+                dim.SetEnd(pcbnew.VECTOR2I(ax, ay))
+                dim.SetTextPos(pcbnew.VECTOR2I(tx, ty))
                 # Store text pos for debug
                 self._leader_tx = f"textPos={dim.GetTextPos()}"
             else:
