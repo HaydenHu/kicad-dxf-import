@@ -126,19 +126,21 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         if not self._show_settings_dialog(entities):
             return  # user cancelled
 
-        # Step 4: Collect dim/leader text to skip duplicate MTEXT imports
-        dim_texts: set[str] = set()
+        # Step 4: Collect dim/leader positions to skip nearby MTEXT imports
+        dim_positions: list[tuple[float, float]] = []
         if self._native_dims:
             for e in entities:
-                if e.entity_type in ("DIMENSION", "LEADER"):
-                    t = getattr(e, 'text', '').strip()
-                    if t:
-                        dim_texts.add(t)
-                        # Also add individual lines from multi-line text
-                        for line in t.split('\n'):
-                            dim_texts.add(line.strip())
+                if e.entity_type == "DIMENSION":
+                    dim_positions.append((e.x_text, e.y_text))
+                    # Also collect sub-lines for \S multiline
+                    for line in getattr(e, 'text', '').split('\n'):
+                        pass
+                elif e.entity_type == "LEADER":
+                    hooks = getattr(e, 'hooks', [])
+                    if hooks:
+                        dim_positions.append(hooks[0])
 
-        count = self._import_entities(entities, dim_texts)
+        count = self._import_entities(entities, dim_positions)
 
         # Debug: check entity types
         type_counts = {}
@@ -337,16 +339,23 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
 
     # ── Entity to board conversion ───────────────────────────
 
-    def _import_entities(self, entities: list[DxfEntity], dim_texts: set = None) -> int:
+    def _import_entities(self, entities: list[DxfEntity], dim_positions: list = None) -> int:
         count = 0
         w_nm = int(self._line_width * 1_000_000)
 
         for entity in entities:
             try:
-                # Skip MTEXT whose text matches dimension/leader text when using native dims
-                if dim_texts and entity.entity_type in ("MTEXT", "TEXT"):
-                    txt = getattr(entity, 'text', '').strip()
-                    if txt and (txt in dim_texts or any(line.strip() in dim_texts for line in txt.split('\n'))):
+                # Skip MTEXT/TEXT near dimension text positions when using native dims
+                if dim_positions and entity.entity_type in ("MTEXT", "TEXT"):
+                    ex = getattr(entity, 'x', None)
+                    ey = getattr(entity, 'y', None)
+                    skip = False
+                    if ex is not None:
+                        for dx, dy in dim_positions:
+                            if abs(ex - dx) < 0.5 and abs(ey - dy) < 0.5:
+                                skip = True
+                                break
+                    if skip:
                         continue
 
                 added = False
