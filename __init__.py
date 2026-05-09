@@ -689,7 +689,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
 
             hooks = getattr(e, 'hooks', [])
             if len(hooks) >= 2:
-                dim.SetStart(pcbnew.VECTOR2I(
+                dim.SetTextPos(pcbnew.VECTOR2I(
                     self._to_board_coord(hooks[0][0]),
                     self._to_board_coord(hooks[0][1]),
                 ))
@@ -697,8 +697,8 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                     self._to_board_coord(hooks[-1][0]),
                     self._to_board_coord(hooks[-1][1]),
                 ))
-                self._leader_hooks_debug = getattr(self, '_leader_hooks_debug', "") + \
-                    f"hooks={hooks} start={dim.GetStart()} end={dim.GetEnd()}\n"
+                # Store text pos for debug
+                self._leader_tx = f"textPos={dim.GetTextPos()}"
             else:
                 self._leader_hooks_debug = getattr(self, '_leader_hooks_debug', "") + \
                     f"NO HOOKS: hooks={hooks} tip=({e.x_tip},{e.y_tip})\n"
