@@ -397,15 +397,16 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         cy_nm = -self._to_board_coord(e.cy)
         r_nm = self._to_board_coord(e.radius)
 
-        sa_rad = math.radians(e.start_angle)
-        ea_rad = math.radians(e.end_angle)
+        # Y-inverted: negate angles for clockwise orientation
+        sa_rad = math.radians(-e.start_angle)
+        ea_rad = math.radians(-e.end_angle)
         sx = cx_nm + int(r_nm * math.cos(sa_rad))
         sy = cy_nm + int(r_nm * math.sin(sa_rad))
         ex = cx_nm + int(r_nm * math.cos(ea_rad))
         ey = cy_nm + int(r_nm * math.sin(ea_rad))
 
         mid = (sa_rad + ea_rad) / 2.0
-        if e.end_angle < e.start_angle:
+        if ea_rad < sa_rad:
             mid += math.pi
         mx = cx_nm + int(r_nm * math.cos(mid))
         my = cy_nm + int(r_nm * math.sin(mid))
@@ -543,15 +544,15 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         cy_nm = -self._to_board_coord(cy)
         r_nm = self._to_board_coord(r)
 
-        sa_rad = math.radians(start_deg)
-        ea_rad = math.radians(end_deg)
+        sa_rad = math.radians(-start_deg)
+        ea_rad = math.radians(-end_deg)
         sx = cx_nm + int(r_nm * math.cos(sa_rad))
         sy = cy_nm + int(r_nm * math.sin(sa_rad))
         ex = cx_nm + int(r_nm * math.cos(ea_rad))
         ey = cy_nm + int(r_nm * math.sin(ea_rad))
 
         mid = (sa_rad + ea_rad) / 2.0
-        if end_deg < start_deg:
+        if ea_rad < sa_rad:
             mid += math.pi
         mx = cx_nm + int(r_nm * math.cos(mid))
         my = cy_nm + int(r_nm * math.sin(mid))
