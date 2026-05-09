@@ -97,6 +97,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         self._text_layer_id: int = pcbnew.Eco1_User
         self._native_dims: bool = True  # Use KiCad native dimensions by default
         self._dim_layer_id: int = pcbnew.Dwgs_User  # Layer for native dimensions
+        self._leaders_seen: int = 0
 
     def Run(self) -> None:
         """Entry point called by KiCad when the plugin action is invoked."""
@@ -156,8 +157,9 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         dim_info = ""
         if hasattr(self, '_dimensions_added'):
             dim_info += f"\nDimensions: {self._dimensions_added}"
+        dim_info += f"\nLeaders seen: {self._leaders_seen}"
         if hasattr(self, '_leaders_added'):
-            dim_info += f"\nLeaders: {self._leaders_added}"
+            dim_info += f", added: {self._leaders_added}"
         if hasattr(self, '_unknown_types') and self._unknown_types:
             dim_info += f"\nUnhandled types:\n{self._unknown_types}"
         if hasattr(self, '_leader_hooks_debug') and self._leader_hooks_debug:
@@ -372,6 +374,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                 elif entity.entity_type == "LEADER":
                     if self._native_dims:
                         added = self._add_leader(entity, w_nm)
+                    self._leaders_seen = getattr(self, '_leaders_seen', 0) + 1
                     # Skip LEADER entity entirely (its text follows as MTEXT)
                 else:
                     # Unknown entity type, count it anyway to track coverage
