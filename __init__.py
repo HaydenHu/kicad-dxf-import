@@ -145,11 +145,15 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             self._show_info("The DXF file contains no supported entities.")
             return
 
-        # Mirror board vertically to fix DXF Y-up vs KiCad Y-down
-        self.board.Mirror(
-            pcbnew.VECTOR2I(0, 0),
-            pcbnew.FLIP_DIRECTION_TOP_BOTTOM,
-        )
+        # Mirror all items vertically to fix DXF Y-up vs KiCad Y-down
+        for item in list(self.board.GetDrawings()):
+            try:
+                item.Mirror(
+                    pcbnew.VECTOR2I(0, 0),
+                    pcbnew.FLIP_DIRECTION_TOP_BOTTOM,
+                )
+            except Exception:
+                pass
 
         pcbnew.Refresh()
 
