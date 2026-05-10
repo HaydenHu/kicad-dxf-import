@@ -629,12 +629,16 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                 dim = pcbnew.PCB_DIM_RADIAL(self.board)
                 dim.SetPrefix("\u2205")
                 radius = e.measured / 2.0 if e.measured > 0 else 1.0
-                # SetStart=point on circle (where arrow tip is)
-                # SetEnd=center (end of leader line, text near here)
+                # Arrow at circle edge pointing outward, with text
+                # SetStart=point on circle (arrow tip at circle perimeter)
+                # SetEnd=circle edge + outward extension for text
+                ext = radius * 1.5  # Extend 50% past circle edge
+                cx = self._to_board_coord(e.x_center)
+                cy = -self._to_board_coord(e.y_center)
                 sx = self._to_board_coord(e.x_center + radius)
-                sy = -self._to_board_coord(e.y_center)
-                ex = self._to_board_coord(e.x_center)
-                ey = -self._to_board_coord(e.y_center)
+                sy = cy
+                ex = self._to_board_coord(e.x_center + ext)
+                ey = cy
             else:
                 dx = abs(e.x_end - e.x_start)
                 dy = abs(e.y_end - e.y_start)
