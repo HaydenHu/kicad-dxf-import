@@ -362,13 +362,6 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
     def _to_board_coord(self, dxf_val: float) -> int:
         return int(round(dxf_val * self.unit_scale))
 
-    def _to_board_xy(self, dxf_x: float, dxf_y: float) -> pcbnew.VECTOR2I:
-        """Convert DXF (x,y) to KiCad VECTOR2I. DXF Y-up -> KiCad Y-down."""
-        return pcbnew.VECTOR2I(
-            int(round(dxf_x * self.unit_scale)),
-            -int(round(dxf_y * self.unit_scale)),
-        )
-
     def _make_shape(self, shape_type: int, layer: int, width_nm: int) -> pcbnew.PCB_SHAPE:
         shape = pcbnew.PCB_SHAPE(self.board)
         shape.SetLayer(layer)
@@ -379,22 +372,24 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
 
     def _add_line(self, e: DxfLine, width_nm: int) -> bool:
         shape = self._make_shape(pcbnew.SHAPE_T_SEGMENT, self.target_layer_id, width_nm)
-        shape.SetStart(self._to_board_xy(e.x1, e.y1))
-        shape.SetEnd(self._to_board_xy(e.x2, e.y2))
+        shape.SetStart(pcbnew.VECTOR2I(self._to_board_coord(e.x1), self._to_board_coord(e.y1)))
+        shape.SetEnd(pcbnew.VECTOR2I(self._to_board_coord(e.x2), self._to_board_coord(e.y2)))
         self.board.Add(shape)
         return True
 
     def _add_circle(self, e: DxfCircle, width_nm: int) -> bool:
         shape = self._make_shape(pcbnew.SHAPE_T_CIRCLE, self.target_layer_id, width_nm)
-        shape.SetCenter(self._to_board_xy(e.cx, e.cy))
-        shape.SetEnd(self._to_board_xy(e.cx + e.radius, e.cy))
+        shape.SetCenter(pcbnew.VECTOR2I(self._to_board_coord(e.cx), self._to_board_coord(e.cy)))
+        shape.SetEnd(pcbnew.VECTOR2I(
+            self._to_board_coord(e.cx + e.radius), self._to_board_coord(e.cy),
+        ))
         self.board.Add(shape)
         return True
 
     def _add_arc(self, e: DxfArc, width_nm: int) -> bool:
         shape = self._make_shape(pcbnew.SHAPE_T_ARC, self.target_layer_id, width_nm)
         cx_nm = self._to_board_coord(e.cx)
-        cy_nm = -self._to_board_coord(e.cy)
+        cy_nm = self._to_board_coord(e.cy)
         r_nm = self._to_board_coord(e.radius)
 
         sa_rad = math.radians(e.start_angle)
@@ -435,9 +430,11 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
 
     def _add_polyline_points(self, pts, closed, width_nm):
         # Cache the converted end point as the next segment's start
-        prev = self._to_board_xy(pts[0][0], pts[0][1])
+        prev = pcbnew.VECTOR2I(
+            self._to_board_coord(pts[0][0]), self._to_board_coord(pts[0][1]))
         for i in range(1, len(pts)):
-            cur = self._to_board_xy(pts[i][0], pts[i][1])
+            cur = pcbnew.VECTOR2I(
+                self._to_board_coord(pts[i][0]), self._to_board_coord(pts[i][1]))
             shape = self._make_shape(pcbnew.SHAPE_T_SEGMENT, self.target_layer_id, width_nm)
             shape.SetStart(prev)
             shape.SetEnd(cur)
@@ -459,7 +456,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         txt = pcbnew.PCB_TEXT(self.board)
         txt.SetLayer(self._text_layer_id)
         txt.SetText(e.text)
-        txt.SetTextPos(self._to_board_xy(e.x, e.y))
+        txt.SetTextPos(pcbnew.VECTOR2I(self._to_board_coord(e.x), self._to_board_coord(e.y)))
         size = self._to_board_coord(e.height)
         txt.SetTextSize(pcbnew.VECTOR2I(size, size))
         txt.SetTextAngle(pcbnew.EDA_ANGLE(e.rotation, pcbnew.DEGREES_T))
@@ -487,7 +484,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         txt = pcbnew.PCB_TEXT(self.board)
         txt.SetLayer(self._text_layer_id)
         txt.SetText(e.text)
-        txt.SetTextPos(self._to_board_xy(e.x, e.y))
+        txt.SetTextPos(pcbnew.VECTOR2I(self._to_board_coord(e.x), self._to_board_coord(e.y)))
         size = self._to_board_coord(e.height)
         txt.SetTextSize(pcbnew.VECTOR2I(size, size))
         txt.SetTextAngle(pcbnew.EDA_ANGLE(e.rotation, pcbnew.DEGREES_T))
@@ -540,7 +537,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
     def _add_raw_arc(self, cx, cy, r, start_deg, end_deg, width_nm):
         shape = self._make_shape(pcbnew.SHAPE_T_ARC, self.target_layer_id, width_nm)
         cx_nm = self._to_board_coord(cx)
-        cy_nm = -self._to_board_coord(cy)
+        cy_nm = self._to_board_coord(cy)
         r_nm = self._to_board_coord(r)
 
         sa_rad = math.radians(start_deg)
@@ -608,9 +605,9 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
         """Add DXF DIMENSION as KiCad native dimension element."""
         try:
             sx = self._to_board_coord(e.x_start)
-            sy = -self._to_board_coord(e.y_start)
+            sy = self._to_board_coord(e.y_start)
             ex = self._to_board_coord(e.x_end)
-            ey = -self._to_board_coord(e.y_end)
+            ey = self._to_board_coord(e.y_end)
 
             if hasattr(e, 'dim_type') and e.dim_type == "DIAMETRIC":
                 dim = pcbnew.PCB_DIM_RADIAL(self.board)
@@ -632,19 +629,21 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                 # Direction for ORTHOGONAL: need per-axis logic
                 if isinstance(dim, pcbnew.PCB_DIM_ORTHOGONAL):
                     if dx > dy:
-                        h = -self._to_board_coord(e.y_text - my)
+                        h = self._to_board_coord(e.y_text - my)
                     else:
                         h = self._to_board_coord(e.x_text - mx)
                 else:
-                    # Cross product sign is flipped due to Y-axis inversion
                     if (e.x_end - e.x_start) * (e.y_text - my) - \
-                       (e.y_end - e.y_start) * (e.x_text - mx) > 0:
+                       (e.y_end - e.y_start) * (e.x_text - mx) < 0:
                         h = -h
                 dim.SetHeight(h)
 
             dim.SetStart(pcbnew.VECTOR2I(sx, sy))
             dim.SetEnd(pcbnew.VECTOR2I(ex, ey))
-            dim.SetTextPos(self._to_board_xy(e.x_text, e.y_text))
+            dim.SetTextPos(pcbnew.VECTOR2I(
+                self._to_board_coord(e.x_text),
+                self._to_board_coord(e.y_text),
+            ))
             dim.SetLayer(self._dim_layer_id)
             dim.SetUnitsMode(pcbnew.DIM_UNITS_MODE_AUTOMATIC)
             dim.SetUnitsFormat(pcbnew.DIM_UNITS_FORMAT_NO_SUFFIX)
@@ -666,14 +665,17 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             hooks = e.hooks
             if len(hooks) >= 2:
                 tx = self._to_board_coord(hooks[0][0])
-                ty = -self._to_board_coord(hooks[0][1])
+                ty = self._to_board_coord(hooks[0][1])
                 ax = self._to_board_coord(hooks[-1][0])
-                ay = -self._to_board_coord(hooks[-1][1])
+                ay = self._to_board_coord(hooks[-1][1])
                 dim.SetStart(pcbnew.VECTOR2I(tx, ty))
                 dim.SetEnd(pcbnew.VECTOR2I(ax, ay))
                 dim.SetTextPos(pcbnew.VECTOR2I(tx, ty))
             else:
-                dim.SetEnd(self._to_board_xy(e.x_tip, e.y_tip))
+                dim.SetEnd(pcbnew.VECTOR2I(
+                    self._to_board_coord(e.x_tip),
+                    self._to_board_coord(e.y_tip),
+                ))
             dim.SetOverrideText("\n")
 
             self.board.Add(dim)
