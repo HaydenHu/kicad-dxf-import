@@ -623,12 +623,18 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                 dim = pcbnew.PCB_DIM_RADIAL(self.board)
                 dim.SetPrefix("\u2205")
                 radius = e.measured / 2.0 if e.measured > 0 else 1.0
-                ext = radius * 1.5
+                # Determine which side text is on (left or right of center)
                 cx = self._to_board_coord(e.x_center)
                 cy = self._to_board_coord(e.y_center)
-                sx = self._to_board_coord(e.x_center + radius)
+                txt_x = e.x_text
+                if txt_x < e.x_center:
+                    sign = -1
+                else:
+                    sign = 1
+                # Arrow at circle edge, leader extends past, text at DXF text pos
+                sx = self._to_board_coord(e.x_center + sign * radius)
                 sy = cy
-                ex = self._to_board_coord(e.x_center + ext)
+                ex = self._to_board_coord(e.x_center + sign * radius * 1.8)
                 ey = cy
             else:
                 dx = abs(e.x_end - e.x_start)
