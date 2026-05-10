@@ -621,7 +621,13 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
 
             if hasattr(e, 'dim_type') and e.dim_type == "DIAMETRIC":
                 dim = pcbnew.PCB_DIM_RADIAL(self.board)
-                dim.SetPrefix("\u2205")  # Diameter symbol ∅
+                dim.SetPrefix("\u2205")
+                # PCB_DIM_RADIAL: SetStart=center, SetEnd=point on circle
+                radius = e.measured / 2.0 if e.measured > 0 else 1.0
+                sx = self._to_board_coord(e.x_center)
+                sy = self._to_board_coord(e.y_center)
+                ex = self._to_board_coord(e.x_center + radius)
+                ey = self._to_board_coord(e.y_center)
             else:
                 dx = abs(e.x_end - e.x_start)
                 dy = abs(e.y_end - e.y_start)

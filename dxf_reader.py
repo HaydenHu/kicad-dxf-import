@@ -164,6 +164,8 @@ class DxfDimension(DxfEntity):
     y_start: float = 0.0
     x_end: float = 0.0
     y_end: float = 0.0
+    x_center: float = 0.0
+    y_center: float = 0.0
     flags: int = 0
     rotation: float = 0.0
     measured: float = 0.0
@@ -850,10 +852,10 @@ class DxfReader:
                 dim.x_end = float(value)
             elif code == 24:
                 dim.y_end = float(value)
-            elif code == 15:  # diametric: leader endpoint
-                dim.x_end = float(value) if dim.x_end == 0 else dim.x_end
-            elif code == 25:
-                dim.y_end = float(value) if dim.y_end == 0 else dim.y_end
+            elif code == 15:  # diametric: circle center X
+                dim.x_center = float(value)
+            elif code == 25:  # diametric: circle center Y
+                dim.y_center = float(value)
             elif code == 42:
                 dim.measured = float(value)
             elif code == 50:
