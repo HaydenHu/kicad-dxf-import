@@ -145,14 +145,9 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             self._show_info("The DXF file contains no supported entities.")
             return
 
-        # Mirror all items (except dims) vertically: DXF Y-up -> KiCad Y-down
-        # Dimensions have Y already negated in _add_dimension
+        # Mirror all items vertically: DXF Y-up -> KiCad Y-down
         for item in list(self.board.GetDrawings()):
             try:
-                if isinstance(item, (pcbnew.PCB_DIM_ALIGNED, pcbnew.PCB_DIM_ORTHOGONAL,
-                                     pcbnew.PCB_DIM_RADIAL, pcbnew.PCB_DIM_LEADER,
-                                     pcbnew.PCB_DIM_CENTER)):
-                    continue
                 item.Mirror(
                     pcbnew.VECTOR2I(0, 0),
                     pcbnew.FLIP_DIRECTION_TOP_BOTTOM,
@@ -619,22 +614,18 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
     def _add_dimension(self, e, width_nm: int) -> bool:
         """Add DXF DIMENSION as KiCad native dimension element."""
         try:
-            # DXF Y-up -> KiCad Y-down: negate all Y coordinates
             sx = self._to_board_coord(e.x_start)
-            sy = -self._to_board_coord(e.y_start)
+            sy = self._to_board_coord(e.y_start)
             ex = self._to_board_coord(e.x_end)
-            ey = -self._to_board_coord(e.y_end)
+            ey = self._to_board_coord(e.y_end)
 
             if hasattr(e, 'dim_type') and e.dim_type == "DIAMETRIC":
                 dim = pcbnew.PCB_DIM_RADIAL(self.board)
                 dim.SetPrefix("\u2205")
                 radius = e.measured / 2.0 if e.measured > 0 else 1.0
-                # Arrow at circle edge pointing outward, with text
-                # SetStart=point on circle (arrow tip at circle perimeter)
-                # SetEnd=circle edge + outward extension for text
-                ext = radius * 1.5  # Extend 50% past circle edge
+                ext = radius * 1.5
                 cx = self._to_board_coord(e.x_center)
-                cy = -self._to_board_coord(e.y_center)
+                cy = self._to_board_coord(e.y_center)
                 sx = self._to_board_coord(e.x_center + radius)
                 sy = cy
                 ex = self._to_board_coord(e.x_center + ext)
@@ -653,7 +644,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
                 )
                 if isinstance(dim, pcbnew.PCB_DIM_ORTHOGONAL):
                     if dx > dy:
-                        h = -self._to_board_coord(e.y_text - my)
+                        h = self._to_board_coord(e.y_text - my)
                     else:
                         h = self._to_board_coord(e.x_text - mx)
                 else:
@@ -666,7 +657,7 @@ class DxfImportPlugin(pcbnew.ActionPlugin):
             dim.SetEnd(pcbnew.VECTOR2I(ex, ey))
             dim.SetTextPos(pcbnew.VECTOR2I(
                 self._to_board_coord(e.x_text),
-                -self._to_board_coord(e.y_text),
+                self._to_board_coord(e.y_text),
             ))
             dim.SetLayer(self._dim_layer_id)
             dim.SetUnitsMode(pcbnew.DIM_UNITS_MODE_AUTOMATIC)
