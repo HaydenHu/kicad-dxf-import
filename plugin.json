@@ -1,0 +1,22 @@
+{
+    "$schema": "https://go.kicad.org/api/schemas/v1",
+    "identifier": "com.github.haydenhu.dxf-import",
+    "name": "Import DXF",
+    "description": "Import DXF files (AutoCAD R12-R2018+) into the current PCB. Supports lines, circles, arcs, polylines, splines, ellipses, text, and dimensions.",
+    "type": "plugin",
+    "runtime": {
+        "type": "python",
+        "min_version": "3.9"
+    },
+    "actions": [
+        {
+            "identifier": "dxf_import",
+            "name": "Import DXF",
+            "description": "Import DXF files into the current PCB board via IPC API",
+            "show-button": true,
+            "scopes": ["pcb"],
+            "entrypoint": "dxf_import.py",
+            "icons-light": ["icon.png"]
+        }
+    ]
+}
